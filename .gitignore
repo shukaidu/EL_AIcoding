@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+.venv/
+venv/
+env/
+
+# Data & models (regenerate with scripts)
+*.mat
+*.pth
+
+# Output figures (regenerate with compare scripts)
+**/compare_spectral_nn/*.png
+**/compare_fv_nn/*.png
+
+# Training history images (regenerate with train)
+**/ML/training_history.png
+**/ml/training_history.png
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
