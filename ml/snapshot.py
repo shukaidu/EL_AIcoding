@@ -1,3 +1,4 @@
+"""Unified save/load checkpoint (MLP: optional hidden_size, num_layers; CNN: optional base)."""
 import torch
 
 
@@ -10,6 +11,8 @@ def save_checkpoint(
     filename,
     hidden_size=None,
     num_hidden_layers=None,
+    num_layers=None,
+    base=None,
 ):
     checkpoint = {
         "model_state_dict": model.state_dict(),
@@ -22,6 +25,10 @@ def save_checkpoint(
         checkpoint["hidden_size"] = hidden_size
     if num_hidden_layers is not None:
         checkpoint["num_hidden_layers"] = num_hidden_layers
+    if num_layers is not None:
+        checkpoint["num_layers"] = num_layers
+    if base is not None:
+        checkpoint["base"] = base
     torch.save(checkpoint, filename)
 
 
@@ -33,4 +40,10 @@ def load_checkpoint(model, optimizer, filename):
     epoch = checkpoint.get("epoch", 0)
     train_loss_history = checkpoint.get("train_loss_history", [])
     test_loss_history = checkpoint.get("test_loss_history", [])
-    return model, optimizer, epoch, train_loss_history, test_loss_history
+    extra = {
+        "hidden_size": checkpoint.get("hidden_size"),
+        "num_hidden_layers": checkpoint.get("num_hidden_layers"),
+        "num_layers": checkpoint.get("num_layers"),
+        "base": checkpoint.get("base", 32),
+    }
+    return model, optimizer, epoch, train_loss_history, test_loss_history, extra

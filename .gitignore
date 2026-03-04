@@ -13,7 +13,13 @@ env/
 *.mat
 *.pth
 
-# Output figures (regenerate with compare scripts)
+# Unified data dir: generated files (gen_data, train, compare)
+data/*/*.mat
+data/*/*.pth
+data/*/training_history.png
+data/*/compare/
+
+# Legacy output figures (regenerate with compare scripts)
 **/compare_spectral_nn/*.png
 **/compare_fv_nn/*.png
 

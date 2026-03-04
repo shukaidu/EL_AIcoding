@@ -172,8 +172,6 @@ def run_reference_solver():
 
 
 if __name__ == "__main__":
-    # Simple smoke test: run the solver and print a few diagnostics
     xc, u0, u, prm = run_reference_solver()
     print(f"nx = {prm['nx']}, nt = {prm['nt']}")
     print(f"u0 mean = {u0.mean():.6f}, u mean = {u.mean():.6f}")
-
