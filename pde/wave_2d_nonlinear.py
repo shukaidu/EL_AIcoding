@@ -22,23 +22,24 @@ def gen_ah_four(xgrid, ygrid, ord_decay):
 
 
 def wave2d_spectral(
-    initial_condition="random",
-    g=9.8,
-    h0=1.0,
-    frot0=0.0,
-    Lx=2 * np.pi,
-    Ly=2 * np.pi,
-    nx=256,
-    ny=256,
-    TF=10.0,
-    TSCREEN=20,
-    nu_h=0.0,
-    nu_q=None,
+    Lx,
+    Ly,
+    nx,
+    ny,
+    TF,
+    TSCREEN,
+    *,
+    g,
+    h0,
+    frot0,
+    nu_h,
+    nu_q,
+    initial_condition,
     rng_seed=None,
 ):
     """
-    Run shallow-water solver. Returns:
-    t_history, U_history (nx, ny, 3, n_frames), xx, yy, initial_condition, g, h0, c
+    Run shallow-water solver. All parameters from config; no defaults here.
+    Returns: t_history, U_history (nx, ny, 3, n_frames), xx, yy, initial_condition, g, h0, c
     U_history[:,:,0,:] = h - h0, [:,:,1,:] = qx, [:,:,2,:] = qy
     """
     if rng_seed is not None:
@@ -47,9 +48,6 @@ def wave2d_spectral(
     dx = Lx / nx
     dy = Ly / ny
     dt = 0.5 * min(dx, dy) / c
-    # MATLAB: nu_h = 0; nu_q = 1e-3 * (min(dx,dy)^2)/dt
-    if nu_h is None or nu_h == 0:
-        nu_h = 0.0
     if nu_q is None or nu_q == 0:
         nu_q = 1e-3 * (min(dx, dy) ** 2) / dt
 

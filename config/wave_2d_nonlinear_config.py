@@ -9,6 +9,9 @@ h0 = 1.0
 c = np.sqrt(g * h0)
 dx = Lx / nx
 dy = Ly / ny
+frot0 = 0.0
+nu_h = 0.0
+nu_q = None  # set in solver when None
 
 # Time
 TF = 10.0

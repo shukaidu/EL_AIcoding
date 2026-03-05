@@ -1,0 +1,196 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage[margin=2.5cm]{geometry}
+
+\title{Element Learning: Numerical Experiments Report\\
+\large 1D Burgers, 2D Linear Wave, 2D Nonlinear Shallow Water}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We report numerical experiments for data-driven surrogate models of three PDEs: (1)~1D inviscid Burgers equation (finite-volume reference vs.\ MLP); (2)~2D linear wave equation (Fourier spectral reference vs.\ MLP); (3)~2D nonlinear rotating shallow water (Fourier spectral reference vs.\ ShrinkCNN). For each problem we generate training data from the reference solver, train a neural network, and compare reference and NN rollouts in time. Training curves and comparison figures are included. All configuration parameters are centralized in config files; PDE and training pipelines are unified under a single codebase.
+\end{abstract}
+
+\section{Background}\label{sec:background}
+
+\subsection{Element learning}
+The goal is to learn a \emph{local} map (one time step or a few) on a small spatial element (patch) from data produced by a high-fidelity solver. At inference time, the learned map is applied in a rollout over the domain, yielding a fast surrogate that can be compared to the reference solver in accuracy and runtime.
+
+\subsection{Three test cases}
+\begin{itemize}
+  \item \textbf{1D Burgers (inviscid):} $u_t + u u_x = 0$ on $[0,L]$ with periodic BC. Reference: finite-volume Godunov flux. NN: MLP mapping a 1D patch (input length $2n_{\mathrm{st}}+n_{\mathrm{wd}}$) to interior ($n_{\mathrm{wd}}$ cells) over one step of $n_{\mathrm{jp}}$ time steps.
+  \item \textbf{2D linear wave:} $u_{tt} = c^2(u_{xx}+u_{yy})$ with periodic BC. Reference: Fourier pseudo-spectral, exact modal time step. NN: MLP mapping two channels (displacement and velocity) on a 2D patch to the interior over one frame.
+  \item \textbf{2D nonlinear shallow water:} Rotating shallow water in Fourier space with RK4. State $(h,q_x,q_y)$. Reference: spectral; NN: ShrinkCNN (patch in, patch out) with optional TV regularization in the loss.
+\end{itemize}
+
+\section{Experimental parameters}\label{sec:parameters}
+
+All parameters are defined in the \texttt{config/} module; below we summarize the main choices.
+
+\subsection{1D Burgers}
+\begin{table}[H]
+  \centering
+  \caption{Burgers: solver and data.}
+  \begin{tabular}{ll}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    Domain length $L$ & 2.0 \\
+    Grid cells $n_x$ & 2000 \\
+    CFL & 0.5 \\
+    Time step $\Delta t$ & CFL$\cdot L/n_x$ \\
+    Patch half-width $n_{\mathrm{st}}$ & $\lfloor n_{\mathrm{jp}}\cdot \mathrm{CFL}\rfloor+1$ \\
+    Interior width $n_{\mathrm{wd}}$ & 100 \\
+    Jumps per NN step $n_{\mathrm{jp}}$ & 80 \\
+    Viscosity $\nu$ & 0 (inviscid) \\
+    IC decay $\alpha$, $u_{\mathrm{mean}}$ & 3.0, 0.0 \\
+    \midrule
+    Training samples & 6000 \\
+    Batch size & 128 \\
+    Epochs & 2500 \\
+    Hidden size / layers & 256 / 6 (MLP) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{2D linear wave}
+\begin{table}[H]
+  \centering
+  \caption{2D linear wave: grid and training.}
+  \begin{tabular}{ll}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    Grid $N_X\times N_Y$ & $256\times 256$ \\
+    Domain $L_x=L_y$ & $2\pi$ \\
+    $\Delta t$ & $2\times 10^{-3}$ \\
+    Wave speed $c$ & 1.0 \\
+    $T_{\mathrm{screen}}$ (steps per frame) & 50 \\
+    Patch interior $n_{\mathrm{wd}}$ & 32 \\
+    \midrule
+    Training samples & 6000 \\
+    Epochs & 100 (quick run; 2500 for full) \\
+    Hidden size / layers & 256 / 5 (MLP, identity output) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{2D nonlinear shallow water}
+\begin{table}[H]
+  \centering
+  \caption{2D nonlinear: grid and training.}
+  \begin{tabular}{ll}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    Grid $n_x\times n_y$ & $128\times 128$ \\
+    $L_x=L_y$ & $2\pi$ \\
+    $g$, $h_0$ & 9.8, 1.0 \\
+    $T_{\mathrm{screen}}$ & 20 \\
+    $n_{\mathrm{wd}}$ & 32 \\
+    \midrule
+    Training samples & 6000 \\
+    Epochs & 50 \\
+    ShrinkCNN base channels & 32 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Results}\label{sec:results}
+
+\subsection{Training history}
+Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the three problems. Burgers and 2D linear use MLP; 2D nonlinear uses ShrinkCNN with per-channel weighting and optional TV term.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{figures/burgers_1d/training_history.png}
+    \caption{Burgers 1D}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{figures/wave_2d_linear/training_history.png}
+    \caption{2D linear wave}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{figures/wave_2d_nonlinear/training_history.png}
+    \caption{2D nonlinear}
+  \end{subfigure}
+  \caption{Training and test loss (log scale) vs.\ epoch.}
+  \label{fig:training}
+\end{figure}
+
+\subsection{1D Burgers: FV vs.\ NN}
+Comparison at 10 output times $t\in[0,2]$. Reference: FV solver; surrogate: MLP rollout. Observed runtimes (example run): FV total $\approx 3.45$\,s, NN total $\approx 0.88$\,s (speedup $\approx 4\times$).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t0.png}
+  \caption{Burgers: $t=0$ (initial).}
+  \label{fig:burgers_t0}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t5.png}
+  \caption{Burgers: $t=1.0$.}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t9.png}
+  \caption{Burgers: $t=2.0$.}
+\end{figure}
+
+\subsection{2D linear wave: Spectral vs.\ NN}
+Comparison at 11 frames. Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (example): Spectral $\approx 0.77$\,s, NN $\approx 0.19$\,s.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t0.png}
+  \caption{2D linear: frame $t=0$ (u and v, spectral vs.\ NN).}
+  \label{fig:linear_t0}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t5.png}
+  \caption{2D linear: mid-run frame.}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t10.png}
+  \caption{2D linear: later frame.}
+\end{figure}
+
+\subsection{2D nonlinear shallow water: Spectral vs.\ NN}
+Comparison at 6 frames for state $(h-h_0,q_x,q_y)$. Reference: spectral; surrogate: ShrinkCNN. L1 error (mean over frames) $\approx 0.045$ in the reported run. Runtimes: Spectral $\approx 2.29$\,s, NN $\approx 0.31$\,s.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t0.png}
+  \caption{2D nonlinear: $t=0$ (three components, spectral vs.\ NN).}
+  \label{fig:nonlinear_t0}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t3.png}
+  \caption{2D nonlinear: mid-run frame.}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t5.png}
+  \caption{2D nonlinear: final frame.}
+\end{figure}
+
+\section{Conclusion}\label{sec:conclusion}
+The pipelines for 1D Burgers, 2D linear wave, and 2D nonlinear shallow water run successfully with a unified workflow: \texttt{gen\_data.py}, \texttt{ml.train}, and \texttt{compare.py} are invoked with \texttt{--problem} to select the case. All configuration is in \texttt{config/}; PDE modules take parameters from config and contain no duplicate defaults. The reported figures show that the NN surrogates track the reference solutions and achieve noticeable speedups in the comparison runs.
+\end{document}

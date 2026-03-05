@@ -110,33 +110,28 @@ def build_ic(ic_type, xx, yy, Lx, Ly, Nx, Ny, K2, ic_params, c):
 
 
 def wave2d_main(
-    c=1.0,
-    NX=512,
-    NY=512,
-    Lx=2 * np.pi,
-    Ly=2 * np.pi,
-    dt=2e-3,
-    TF=4.0,
-    TSCREEN=50,
-    initial_condition="random_white",
-    rng_seed=1,
+    NX,
+    NY,
+    Lx,
+    Ly,
+    dt,
+    TF,
+    TSCREEN,
+    *,
+    c,
+    initial_condition,
+    rng_seed,
     ic_params=None,
 ):
     """
     Run 2D linear wave equation (Fourier spectral, exact time step).
+    All parameters (grid, time, c, initial_condition, rng_seed) from config; no defaults here.
     Returns: t_history, u_history, v_history, xx, yy, initial_condition.
     u_history shape (NX, NY, n_frames), v_history same.
     """
     if ic_params is None:
-        ic_params = {}
-    ic_params.setdefault("m_flower", 8)
-    ic_params.setdefault("k0_packet", 8)
-    ic_params.setdefault("theta_pkt", np.pi / 6)
-    ic_params.setdefault("sigma_frac", 0.15)
-    ic_params.setdefault("band_kmin", 10)
-    ic_params.setdefault("band_kmax", 14)
-    ic_params.setdefault("white_smooth", 0.1)
-    ic_params.setdefault("amplitude", 1.0)
+        from config import wave_2d_linear_config
+        ic_params = wave_2d_linear_config.ic_param_defaults.copy()
     ic_params["rng_seed"] = rng_seed
 
     # Grid (periodic, exclude right endpoint)

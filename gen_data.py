@@ -9,44 +9,62 @@ import sys
 import argparse
 import numpy as np
 from scipy.io import savemat
+from multiprocessing import Pool, cpu_count
 
 _repo_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _repo_root)
 
 
+def _burgers_1d_single_trajectory(args):
+    """Top-level for multiprocessing pickle. args = (seed, per_traj). Returns (inputs_list, outputs_list)."""
+    seed, per_traj = args
+    import config.burgers_1d_config as cfg
+    from pde.burgers_1d import gen_dist, build_diffusion_matrix, integrate_burger
+    np.random.seed(seed)
+    nx, nt = cfg.nx, cfg.nt
+    njp, nst, nwd = cfg.njp, cfg.nst, cfg.nwd
+    u0, _ = gen_dist(nx, cfg.alpha)
+    u0 = u0 + cfg.u_mean
+    u = u0.copy()
+    u_history = np.zeros((nx, nt + 1), dtype=float)
+    u_history[:, 0] = u
+    A = build_diffusion_matrix(nx, cfg.dt, cfg.dx, cfg.nu)
+    for n in range(nt):
+        u = integrate_burger(u, cfg.dt, cfg.dx, cfg.nu, A=A)
+        u_history[:, n + 1] = u
+    n_avail = (nx - 2 * nst - nwd + 1) * max(0, nt - njp + 1)
+    n_take = min(per_traj, n_avail)
+    inputs_list, outputs_list = [], []
+    if n_take <= 0:
+        return inputs_list, outputs_list
+    i0_pool = np.random.randint(0, nx - 2 * nst - nwd + 1, size=n_take)
+    j0_pool = np.random.randint(0, nt - njp + 1, size=n_take)
+    for k in range(n_take):
+        i0, j0 = i0_pool[k], j0_pool[k]
+        inputs_list.append(u_history[i0 : i0 + 2 * nst + nwd, j0])
+        outputs_list.append(u_history[i0 + nst : i0 + nst + nwd, j0 + njp])
+    return inputs_list, outputs_list
+
+
 def run_burgers_1d(data_dir):
-    from pde.burgers_1d import set_param, gen_dist, build_diffusion_matrix, integrate_burger
     import config.burgers_1d_config as cfg
 
-    prm = set_param()
-    nx, nt, njp, nst, nwd = prm["nx"], prm["nt"], prm["njp"], prm["nst"], prm["nwd"]
     rng = np.random.RandomState(cfg.seed_base)
     seeds = [rng.randint(0, 2**31) for _ in range(cfg.n_trajectories)]
-    all_inputs, all_outputs = [], []
     per_traj = (cfg.nsamp + cfg.n_trajectories - 1) // cfg.n_trajectories
+    run_configs = [(seed, per_traj) for seed in seeds]
+    n_workers = min(cfg.n_trajectories, max(1, cpu_count() - 1))
+    if n_workers <= 1:
+        results = [_burgers_1d_single_trajectory(c) for c in run_configs]
+    else:
+        with Pool(n_workers) as pool:
+            results = pool.map(_burgers_1d_single_trajectory, run_configs)
 
-    for seed in seeds:
-        np.random.seed(seed)
-        u0, _ = gen_dist(nx, prm["alpha"])
-        u0 = u0 + prm["u_mean"]
-        u = u0.copy()
-        u_history = np.zeros((nx, nt + 1), dtype=float)
-        u_history[:, 0] = u
-        A = build_diffusion_matrix(nx, prm["dt"], prm["dx"], prm["nu"])
-        for n in range(nt):
-            u = integrate_burger(u, prm["dt"], prm["dx"], prm["nu"], A=A)
-            u_history[:, n + 1] = u
-        n_avail = (nx - 2 * nst - nwd + 1) * max(0, nt - njp + 1)
-        n_take = min(per_traj, n_avail)
-        if n_take <= 0:
-            continue
-        i0_pool = np.random.randint(0, nx - 2 * nst - nwd + 1, size=n_take)
-        j0_pool = np.random.randint(0, nt - njp + 1, size=n_take)
-        for k in range(n_take):
-            i0, j0 = i0_pool[k], j0_pool[k]
-            all_inputs.append(u_history[i0 : i0 + 2 * nst + nwd, j0])
-            all_outputs.append(u_history[i0 + nst : i0 + nst + nwd, j0 + njp])
-
+    all_inputs = []
+    all_outputs = []
+    for inputs_list, outputs_list in results:
+        all_inputs.extend(inputs_list)
+        all_outputs.extend(outputs_list)
     input_arr = np.array(all_inputs, dtype=float).T
     output_arr = np.array(all_outputs, dtype=float).T
     os.makedirs(data_dir, exist_ok=True)
@@ -55,9 +73,31 @@ def run_burgers_1d(data_dir):
     print(f"Saved {out_path}  input {input_arr.shape}  output {output_arr.shape}")
 
 
-def run_wave_2d_linear(data_dir):
+def _wave2d_linear_single_run(args):
+    """Top-level for multiprocessing pickle. args = (ic, seed, NX, NY, Lx, Ly, dt, TF, TSCREEN, c). Returns (u_hist, v_hist)."""
+    ic, seed, NX, NY, Lx, Ly, dt, TF, TSCREEN, c = args
     from pde.wave_2d_linear import wave2d_main
+    t_hist, u_hist, v_hist, xx, yy, _ = wave2d_main(
+        NX, NY, Lx, Ly, dt, TF, TSCREEN,
+        c=c, initial_condition=ic, rng_seed=seed,
+    )
+    return u_hist, v_hist
+
+
+def run_wave_2d_linear(data_dir):
     import config.wave_2d_linear_config as cfg
+
+    run_configs = [
+        (cfg.ic_list[run % len(cfg.ic_list)], cfg.rng_seeds[run],
+         cfg.NX, cfg.NY, cfg.Lx, cfg.Ly, cfg.dt, cfg.TF, cfg.TSCREEN, cfg.c)
+        for run in range(cfg.ntest)
+    ]
+    n_workers = min(cfg.ntest, max(1, cpu_count() - 1))
+    if n_workers <= 1:
+        results = [_wave2d_linear_single_run(c) for c in run_configs]
+    else:
+        with Pool(n_workers) as pool:
+            results = pool.map(_wave2d_linear_single_run, run_configs)
 
     input_arr_u = np.zeros((cfg.patch_side, cfg.patch_side, cfg.nsamp), dtype=np.float32)
     input_arr_v = np.zeros((cfg.patch_side, cfg.patch_side, cfg.nsamp), dtype=np.float32)
@@ -65,18 +105,15 @@ def run_wave_2d_linear(data_dir):
     output_arr_v = np.zeros((cfg.nwd, cfg.nwd, cfg.nsamp), dtype=np.float32)
     cnt = 0
     n_per_run = cfg.nsamp // cfg.ntest
-    for run in range(cfg.ntest):
-        ic = cfg.ic_list[run % len(cfg.ic_list)]
-        seed = cfg.rng_seeds[run]
-        t_hist, u_hist, v_hist, xx, yy, _ = wave2d_main(
-            NX=cfg.NX, NY=cfg.NY, Lx=cfg.Lx, Ly=cfg.Ly, dt=cfg.dt, TF=cfg.TF, TSCREEN=cfg.TSCREEN,
-            initial_condition=ic, rng_seed=seed,
-        )
+    rng = np.random.default_rng(42)
+    for run_idx, (u_hist, v_hist) in enumerate(results):
         n_frames = u_hist.shape[2]
         for _ in range(n_per_run):
-            i0 = np.random.randint(0, cfg.NX - cfg.patch_side + 1)
-            j0 = np.random.randint(0, cfg.NY - cfg.patch_side + 1)
-            t0 = np.random.randint(0, max(1, n_frames - cfg.njp))
+            if cnt >= cfg.nsamp:
+                break
+            i0 = rng.integers(0, cfg.NX - cfg.patch_side + 1)
+            j0 = rng.integers(0, cfg.NY - cfg.patch_side + 1)
+            t0 = rng.integers(0, max(1, n_frames - cfg.njp))
             t1 = t0 + cfg.njp
             if t1 >= n_frames:
                 continue
@@ -85,8 +122,6 @@ def run_wave_2d_linear(data_dir):
             output_arr_u[:, :, cnt] = u_hist[i0 + cfg.nst : i0 + cfg.nst + cfg.nwd, j0 + cfg.nst : j0 + cfg.nst + cfg.nwd, t1]
             output_arr_v[:, :, cnt] = v_hist[i0 + cfg.nst : i0 + cfg.nst + cfg.nwd, j0 + cfg.nst : j0 + cfg.nst + cfg.nwd, t1]
             cnt += 1
-            if cnt >= cfg.nsamp:
-                break
         if cnt >= cfg.nsamp:
             break
     input_arr_u = input_arr_u[:, :, :cnt].reshape((cfg.patch_side ** 2, cnt))
@@ -102,21 +137,23 @@ def run_wave_2d_linear(data_dir):
 
 
 def _wave2d_nonlinear_single_run(args):
-    """Top-level for multiprocessing pickle on Windows. args = (seed, ic, TF, TSCREEN, nx, ny)."""
-    seed, ic, TF, TSCREEN, nx, ny = args
+    """Top-level for multiprocessing pickle on Windows. args = (seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, frot0, nu_h, nu_q)."""
+    seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, frot0, nu_h, nu_q = args
     from pde.wave_2d_nonlinear import wave2d_spectral
     t_hist, U_hist, _, _, _, _, _, _ = wave2d_spectral(
-        initial_condition=ic, TF=TF, TSCREEN=TSCREEN, nx=nx, ny=ny, rng_seed=seed
+        Lx, Ly, nx, ny, TF, TSCREEN,
+        g=g, h0=h0, frot0=frot0, nu_h=nu_h, nu_q=nu_q,
+        initial_condition=ic, rng_seed=seed,
     )
     return t_hist, U_hist
 
 
 def run_wave_2d_nonlinear(data_dir):
-    from multiprocessing import Pool, cpu_count
     import config.wave_2d_nonlinear_config as cfg
 
     run_configs = [
-        (i + 1, cfg.ic_list[i % len(cfg.ic_list)], cfg.TF, cfg.TSCREEN, cfg.nx, cfg.ny)
+        (i + 1, cfg.ic_list[i % len(cfg.ic_list)], cfg.TF, cfg.TSCREEN, cfg.nx, cfg.ny, cfg.Lx, cfg.Ly,
+         cfg.g, cfg.h0, cfg.frot0, cfg.nu_h, cfg.nu_q)
         for i in range(cfg.ntest)
     ]
     n_workers = min(cfg.ntest, max(1, cpu_count() - 1))

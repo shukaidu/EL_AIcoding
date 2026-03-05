@@ -3,51 +3,6 @@ from scipy.sparse import diags, eye
 from scipy.sparse.linalg import spsolve
 
 
-def set_param():
-    """
-    Python translation of the MATLAB setParam.m.
-    Returns a dict with all parameters needed for the solver and data generation.
-    """
-    CFL = 0.5
-    umax = 1.0
-
-    L = 2.0
-    nx = 2000
-    dx = L / nx
-
-    t_end = 4.0
-    dt = CFL * dx / umax
-    nt = int(round(t_end / dt))
-
-    # 预测时间步：每步 njp*dt，减小 njp 使单步更容易学（短时预测更准）
-    njp = 80
-    nst = int(np.floor(njp * CFL)) + 1
-    nwd = 100
-
-    alpha = 3.0
-    u_mean = 0.0
-
-    # Viscosity; set to 0 for inviscid Burgers as requested
-    nu = 0.0
-
-    return {
-        "CFL": CFL,
-        "umax": umax,
-        "L": L,
-        "nx": nx,
-        "dx": dx,
-        "t_end": t_end,
-        "dt": dt,
-        "nt": nt,
-        "njp": njp,
-        "nst": nst,
-        "nwd": nwd,
-        "alpha": alpha,
-        "u_mean": u_mean,
-        "nu": nu,
-    }
-
-
 def gen_dist(N: int, alpha: float):
     """
     Python translation of genDist.m.
@@ -137,41 +92,36 @@ def integrate_burger(u, dt: float, dx: float, nu: float, A=None):
 
 def run_reference_solver():
     """
-    Convenience function: run the full FV solver with parameters
-    translated from MATLAB's test_Burger.m using integrateBurger.m.
+    Run the full FV solver with parameters from config.burgers_1d_config.
     Returns:
-        xc  : cell centers in [0, L]
-        u0  : initial condition
-        u   : final solution after t_end
-        prm : parameter dict from set_param()
+        xc : cell centers in [0, L]
+        u0 : initial condition
+        u  : final solution after t_end
     """
-    prm = set_param()
-    L = prm["L"]
-    nx = prm["nx"]
-    dx = prm["dx"]
-    dt = prm["dt"]
-    nt = prm["nt"]
-    alpha = prm["alpha"]
-    u_mean = prm["u_mean"]
-    nu = prm["nu"]
+    from config import burgers_1d_config as cfg
+    L = cfg.L
+    nx, dx, dt, nt = cfg.nx, cfg.dx, cfg.dt, cfg.nt
+    alpha, u_mean, nu = cfg.alpha, cfg.u_mean, cfg.nu
 
-    # Spatial grid (cell centers)
     xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
-
-    # Initial condition (match genData/test_Burger logic)
     u0, _ = gen_dist(nx, alpha)
     u0 = u0 + u_mean
 
     u = u0.copy()
     A = build_diffusion_matrix(nx, dt, dx, nu)
-
     for _ in range(nt):
         u = integrate_burger(u, dt, dx, nu, A=A)
 
-    return xc, u0, u, prm
+    return xc, u0, u
 
 
 if __name__ == "__main__":
-    xc, u0, u, prm = run_reference_solver()
-    print(f"nx = {prm['nx']}, nt = {prm['nt']}")
+    import os
+    import sys
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from config import burgers_1d_config as cfg
+    xc, u0, u = run_reference_solver()
+    print(f"nx = {cfg.nx}, nt = {cfg.nt}")
     print(f"u0 mean = {u0.mean():.6f}, u mean = {u.mean():.6f}")

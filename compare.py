@@ -20,16 +20,15 @@ sys.path.insert(0, _repo_root)
 
 
 def _compare_burgers_1d(data_dir, out_dir):
-    from pde.burgers_1d import set_param, gen_dist, build_diffusion_matrix, integrate_burger
+    from pde.burgers_1d import gen_dist, build_diffusion_matrix, integrate_burger
     import config.burgers_1d_config as cfg
     from common.models import MLP
     from ml.snapshot import load_checkpoint
 
-    prm = set_param()
-    L, nx, dx, dt, njp, nst, nwd, alpha, u_mean, nu = (
-        prm["L"], prm["nx"], prm["dx"], prm["dt"], prm["njp"], prm["nst"], prm["nwd"],
-        prm["alpha"], prm["u_mean"], prm["nu"],
-    )
+    L = cfg.L
+    nx, dx, dt = cfg.nx, cfg.dx, cfg.dt
+    njp, nst, nwd = cfg.njp, cfg.nst, cfg.nwd
+    alpha, u_mean, nu = cfg.alpha, cfg.u_mean, cfg.nu
     times = list(np.linspace(0, 2, 10))
     n_times = len(times)
     xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
@@ -142,8 +141,8 @@ def _compare_wave_2d_linear(data_dir, out_dir):
 
     t0_spec = time.perf_counter()
     t_hist, u_hist, v_hist, xx, yy, _ = wave2d_main(
-        NX=cfg.NX, NY=cfg.NY, Lx=cfg.Lx, Ly=cfg.Ly, dt=cfg.dt, TF=1.0, TSCREEN=cfg.TSCREEN,
-        initial_condition="random_white", rng_seed=42,
+        cfg.NX, cfg.NY, cfg.Lx, cfg.Ly, cfg.dt, 1.0, cfg.TSCREEN,
+        c=cfg.c, initial_condition="random_white", rng_seed=42,
     )
     spectral_time = time.perf_counter() - t0_spec
     n_frames = u_hist.shape[2]
@@ -266,7 +265,9 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
 
     t0_spectral = time.perf_counter()
     t_hist, U_hist, xx, yy, _, _, _, _ = wave2d_spectral(
-        initial_condition="random", TF=1.0, TSCREEN=cfg.TSCREEN, nx=cfg.nx, ny=cfg.ny, rng_seed=42
+        cfg.Lx, cfg.Ly, cfg.nx, cfg.ny, 1.0, cfg.TSCREEN,
+        g=cfg.g, h0=cfg.h0, frot0=cfg.frot0, nu_h=cfg.nu_h, nu_q=cfg.nu_q,
+        initial_condition="random", rng_seed=42,
     )
     spectral_time = time.perf_counter() - t0_spectral
     n_frames = U_hist.shape[3]
