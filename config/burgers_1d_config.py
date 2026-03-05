@@ -13,13 +13,13 @@ t_end = 4.0
 dt = CFL * dx / umax
 nt = int(round(t_end / dt))
 # NN prediction window
-njp = 80
+njp = 100
 nst = int(np.floor(njp * CFL)) + 1
 nwd = 100
 # Initial condition
 alpha = 3.0
 u_mean = 0.0
-nu = 0.0
+nu = 1e-2
 
 # ---------------------------------------------------------------------------
 # Data generation
@@ -33,9 +33,16 @@ seed_base = 42
 # ---------------------------------------------------------------------------
 b_size = 128
 num_epochs = 2500
-hidden_size = 256
+hidden_size = 128
 num_hidden_layers = 6
 lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
+
+# ---------------------------------------------------------------------------
+# Compare (reference vs NN rollout)
+# ---------------------------------------------------------------------------
+compare_seed = 42
+compare_t_end = 2.0
+compare_n_times = 10
 
 # ---------------------------------------------------------------------------
 # Data file names (under data/burgers_1d/)

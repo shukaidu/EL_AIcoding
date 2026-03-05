@@ -165,12 +165,8 @@ def run_wave_2d_nonlinear(data_dir):
 
     t_hist, U_hist = results[0]
     nx_, ny_, _, nt = U_hist.shape
-    dt_samp = float(t_hist[1] - t_hist[0]) if len(t_hist) > 1 else cfg.TSCREEN * (0.5 * (2 * np.pi / cfg.nx) / (9.8**0.5))
-    nst = cfg.nst_from_dt_samp(dt_samp)
-    halo = 2 * nst
-    halo = ((halo + 3) // 4) * 4
-    nst = halo // 2
-    patch_side = cfg.nwd + 2 * nst
+    nst = cfg.nst
+    patch_side = cfg.patch_side
     print(f"nst={nst}, patch_side={patch_side}")
 
     U_historys = np.zeros((nx_, ny_, 3, nt, cfg.ntest), dtype=np.float64)

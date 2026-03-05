@@ -40,7 +40,7 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
 \subsection{1D Burgers}
 \begin{table}[H]
   \centering
-  \caption{Burgers: solver and data.}
+  \caption{Burgers: solver and data (from \texttt{config/burgers\_1d\_config.py}).}
   \begin{tabular}{ll}
     \toprule
     Parameter & Value \\
@@ -49,16 +49,16 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     Grid cells $n_x$ & 2000 \\
     CFL & 0.5 \\
     Time step $\Delta t$ & CFL$\cdot L/n_x$ \\
-    Patch half-width $n_{\mathrm{st}}$ & $\lfloor n_{\mathrm{jp}}\cdot \mathrm{CFL}\rfloor+1$ \\
+    Patch half-width $n_{\mathrm{st}}$ & $\lfloor n_{\mathrm{jp}}\cdot \mathrm{CFL}\rfloor+1$ (51) \\
     Interior width $n_{\mathrm{wd}}$ & 100 \\
-    Jumps per NN step $n_{\mathrm{jp}}$ & 80 \\
-    Viscosity $\nu$ & 0 (inviscid) \\
+    Jumps per NN step $n_{\mathrm{jp}}$ & 100 \\
+    Viscosity $\nu$ & $10^{-2}$ \\
     IC decay $\alpha$, $u_{\mathrm{mean}}$ & 3.0, 0.0 \\
     \midrule
     Training samples & 6000 \\
     Batch size & 128 \\
     Epochs & 2500 \\
-    Hidden size / layers & 256 / 6 (MLP) \\
+    Hidden size / layers & 128 / 6 (MLP) \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -66,7 +66,7 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
 \subsection{2D linear wave}
 \begin{table}[H]
   \centering
-  \caption{2D linear wave: grid and training.}
+  \caption{2D linear wave: grid and training (from \texttt{config/wave\_2d\_linear\_config.py}).}
   \begin{tabular}{ll}
     \toprule
     Parameter & Value \\
@@ -76,10 +76,12 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     $\Delta t$ & $2\times 10^{-3}$ \\
     Wave speed $c$ & 1.0 \\
     $T_{\mathrm{screen}}$ (steps per frame) & 50 \\
+    Frames per NN step $n_{\mathrm{jp}}$ & 2 \\
     Patch interior $n_{\mathrm{wd}}$ & 32 \\
+    Compare IC & ring \\
     \midrule
     Training samples & 6000 \\
-    Epochs & 100 (quick run; 2500 for full) \\
+    Epochs & 2500 \\
     Hidden size / layers & 256 / 5 (MLP, identity output) \\
     \bottomrule
   \end{tabular}
@@ -88,7 +90,7 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
 \subsection{2D nonlinear shallow water}
 \begin{table}[H]
   \centering
-  \caption{2D nonlinear: grid and training.}
+  \caption{2D nonlinear: grid and training (from \texttt{config/wave\_2d\_nonlinear\_config.py}).}
   \begin{tabular}{ll}
     \toprule
     Parameter & Value \\
@@ -98,9 +100,10 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     $g$, $h_0$ & 9.8, 1.0 \\
     $T_{\mathrm{screen}}$ & 20 \\
     $n_{\mathrm{wd}}$ & 32 \\
+    Compare IC & random \\
     \midrule
     Training samples & 6000 \\
-    Epochs & 50 \\
+    Epochs & 100 \\
     ShrinkCNN base channels & 32 \\
     \bottomrule
   \end{tabular}
@@ -132,7 +135,7 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
 \end{figure}
 
 \subsection{1D Burgers: FV vs.\ NN}
-Comparison at 10 output times $t\in[0,2]$. Reference: FV solver; surrogate: MLP rollout. Observed runtimes (example run): FV total $\approx 3.45$\,s, NN total $\approx 0.88$\,s (speedup $\approx 4\times$).
+Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (reported run): FV total $\approx 4.22$\,s, NN total $\approx 0.30$\,s (speedup $\approx 14\times$).
 
 \begin{figure}[H]
   \centering
@@ -152,27 +155,27 @@ Comparison at 10 output times $t\in[0,2]$. Reference: FV solver; surrogate: MLP 
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 11 frames. Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (example): Spectral $\approx 0.77$\,s, NN $\approx 0.19$\,s.
+Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (reported run): Spectral $\approx 0.84$\,s, NN $\approx 0.11$\,s.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t0.png}
-  \caption{2D linear: frame $t=0$ (u and v, spectral vs.\ NN).}
+  \caption{2D linear: frame 0 (u and v, spectral vs.\ NN).}
   \label{fig:linear_t0}
 \end{figure}
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t5.png}
+  \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t3.png}
   \caption{2D linear: mid-run frame.}
 \end{figure}
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t10.png}
-  \caption{2D linear: later frame.}
+  \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t5.png}
+  \caption{2D linear: final frame.}
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 6 frames for state $(h-h_0,q_x,q_y)$. Reference: spectral; surrogate: ShrinkCNN. L1 error (mean over frames) $\approx 0.045$ in the reported run. Runtimes: Spectral $\approx 2.29$\,s, NN $\approx 0.31$\,s.
+Comparison at 6 frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}). Reference: spectral; surrogate: ShrinkCNN. L1 error (mean over frames) $\approx 0.011$ in the reported run. Runtimes: Spectral $\approx 1.88$\,s, NN $\approx 0.17$\,s.
 
 \begin{figure}[H]
   \centering

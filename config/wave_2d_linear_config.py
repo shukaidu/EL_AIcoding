@@ -21,9 +21,9 @@ dt = 2e-3
 TF = 4.0
 TSCREEN = 50
 
-# Prediction window: njp=1 so one NN step = one frame
+# Prediction window: one NN step = njp frames
 nwd = 32
-njp = 1
+njp = 2
 
 dx = Lx / NX
 dt_samp = TSCREEN * dt
@@ -38,10 +38,15 @@ rng_seeds = list(range(1, 21))
 
 # Training
 b_size = 128
-num_epochs = 100  # quick test; use 2500 for full run
+num_epochs = 2500
 hidden_size = 256
 num_layers = 5
-lr_schedule = [(50, 1e-3), (80, 1e-4), (100, 1e-5)]
+lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
+
+# Compare (reference vs NN rollout)
+compare_TF = 1.0
+compare_ic = "ring"
+compare_seed = 42
 
 # Data file names (under data/wave_2d_linear/)
 data_mat = "data_wave.mat"

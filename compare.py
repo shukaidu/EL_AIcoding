@@ -29,10 +29,10 @@ def _compare_burgers_1d(data_dir, out_dir):
     nx, dx, dt = cfg.nx, cfg.dx, cfg.dt
     njp, nst, nwd = cfg.njp, cfg.nst, cfg.nwd
     alpha, u_mean, nu = cfg.alpha, cfg.u_mean, cfg.nu
-    times = list(np.linspace(0, 2, 10))
+    times = list(np.linspace(0, cfg.compare_t_end, cfg.compare_n_times))
     n_times = len(times)
     xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
-    np.random.seed(42)
+    np.random.seed(cfg.compare_seed)
     u0, _ = gen_dist(nx, alpha)
     u0 = u0 + u_mean
 
@@ -43,7 +43,7 @@ def _compare_burgers_1d(data_dir, out_dir):
     fv_time_list = [0.0] * n_times
     next_time_idx = 1
     t0_fv = time.perf_counter()
-    nt_needed = int(np.ceil(2.0 / dt))
+    nt_needed = int(np.ceil(cfg.compare_t_end / dt))
     for _ in range(nt_needed):
         u_fv = integrate_burger(u_fv, dt, dx, nu, A=A)
         t_fv += dt
@@ -55,7 +55,7 @@ def _compare_burgers_1d(data_dir, out_dir):
             break
 
     dt_nn = njp * dt
-    n_nn_steps = int(round(2.0 / dt_nn))
+    n_nn_steps = int(round(cfg.compare_t_end / dt_nn))
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model_path = os.path.join(data_dir, cfg.model_pth)
     if not os.path.isfile(model_path):
@@ -141,8 +141,8 @@ def _compare_wave_2d_linear(data_dir, out_dir):
 
     t0_spec = time.perf_counter()
     t_hist, u_hist, v_hist, xx, yy, _ = wave2d_main(
-        cfg.NX, cfg.NY, cfg.Lx, cfg.Ly, cfg.dt, 1.0, cfg.TSCREEN,
-        c=cfg.c, initial_condition="random_white", rng_seed=42,
+        cfg.NX, cfg.NY, cfg.Lx, cfg.Ly, cfg.dt, cfg.compare_TF, cfg.TSCREEN,
+        c=cfg.c, initial_condition=cfg.compare_ic, rng_seed=cfg.compare_seed,
     )
     spectral_time = time.perf_counter() - t0_spec
     n_frames = u_hist.shape[2]
@@ -173,13 +173,15 @@ def _compare_wave_2d_linear(data_dir, out_dir):
                 v_nn[ii * nwd : (ii + 1) * nwd, jj * nwd : (jj + 1) * nwd] = out[n:].reshape(cfg.nwd, cfg.nwd)
         return u_nn, v_nn
 
+    # One NN step advances by njp spectral frames; compare only at frames 0, njp, 2*njp, ...
+    n_nn_steps = (n_frames - 1) // cfg.njp
     u_nn = u_hist[:, :, 0].copy()
     v_nn = v_hist[:, :, 0].copy()
     nn_frames_u = [u_nn.copy()]
     nn_frames_v = [v_nn.copy()]
     nn_time_list = [0.0]
     t0_nn = time.perf_counter()
-    for _ in range(n_frames - 1):
+    for _ in range(n_nn_steps):
         u_nn, v_nn = one_nn_step(u_nn, v_nn, model, cfg.nwd, cfg.nst, cfg.patch_side, device)
         nn_frames_u.append(u_nn.copy())
         nn_frames_v.append(v_nn.copy())
@@ -196,27 +198,30 @@ def _compare_wave_2d_linear(data_dir, out_dir):
         clims.append((lo - pad, hi + pad))
 
     os.makedirs(out_dir, exist_ok=True)
-    for k in range(n_frames):
-        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    # Plot only at frames where NN and spectral are at same time: k = 0, njp, 2*njp, ...
+    n_compare = len(nn_frames_u)
+    for i in range(n_compare):
+        k = i * cfg.njp
+        fig, axes = plt.subplots(2, 2, figsize=(10, 8), constrained_layout=True)
         for c in range(2):
             spec_f = u_hist[:, :, k] if c == 0 else v_hist[:, :, k]
-            nn_f = nn_frames_u[k] if c == 0 else nn_frames_v[k]
+            nn_f = nn_frames_u[i] if c == 0 else nn_frames_v[i]
             pc0 = axes[0, c].pcolormesh(xx, yy, spec_f.T, shading="auto")
             axes[0, c].set_title(f"Spectral {comp_names[c]}")
             pc1 = axes[1, c].pcolormesh(xx, yy, nn_f.T, shading="auto")
             axes[1, c].set_title(f"NN {comp_names[c]}")
             pc0.set_clim(clims[c])
             pc1.set_clim(clims[c])
+            fig.colorbar(pc0, ax=[axes[0, c], axes[1, c]], label=comp_names[c])
         time_spec = spectral_time_per_frame[k]
-        time_nn = nn_time_list[k]
+        time_nn = nn_time_list[i]
         speedup = time_spec / time_nn if time_nn > 0 else float("inf")
         fig.text(0.02, 0.98, f"Spectral: {time_spec:.3f} s\nNN: {time_nn:.4f} s\nSpeedup: {speedup:.1f}×",
                  fontsize=9, verticalalignment="top", bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
-        plt.suptitle(f"t = {t_hist[k]:.3f}")
-        plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, f"t{k}.png"), dpi=120)
+        plt.suptitle(f"t = {t_hist[k]:.3f} (frame {k})")
+        plt.savefig(os.path.join(out_dir, f"t{i}.png"), dpi=120)
         plt.close()
-    print(f"Saved {n_frames} figures to {out_dir}/  Spectral: {spectral_time:.3f} s  NN: {nn_time_list[-1]:.4f} s")
+    print(f"Saved {n_compare} figures to {out_dir}/  Spectral: {spectral_time:.3f} s  NN: {nn_time_list[-1]:.4f} s")
 
 
 def _compare_wave_2d_nonlinear(data_dir, out_dir):
@@ -265,24 +270,27 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
 
     t0_spectral = time.perf_counter()
     t_hist, U_hist, xx, yy, _, _, _, _ = wave2d_spectral(
-        cfg.Lx, cfg.Ly, cfg.nx, cfg.ny, 1.0, cfg.TSCREEN,
+        cfg.Lx, cfg.Ly, cfg.nx, cfg.ny, cfg.compare_TF, cfg.TSCREEN,
         g=cfg.g, h0=cfg.h0, frot0=cfg.frot0, nu_h=cfg.nu_h, nu_q=cfg.nu_q,
-        initial_condition="random", rng_seed=42,
+        initial_condition=cfg.compare_ic, rng_seed=cfg.compare_seed,
     )
     spectral_time = time.perf_counter() - t0_spectral
     n_frames = U_hist.shape[3]
     spectral_time_per_frame = [spectral_time * k / max(1, n_frames) for k in range(n_frames)]
 
+    # One NN step advances by njp spectral frames; compare only at frames 0, njp, 2*njp, ...
+    n_nn_steps = (n_frames - 1) // cfg.njp
     U_nn = U_hist[:, :, :, 0].copy()
     nn_frames = [U_nn.copy()]
     nn_time_list = [0.0]
     t0_nn = time.perf_counter()
-    for _ in range(n_frames - 1):
+    for _ in range(n_nn_steps):
         U_nn = integrate_nn_cnn(model, U_nn, nwd, nst, patch_side, device)
         nn_frames.append(U_nn.copy())
         nn_time_list.append(time.perf_counter() - t0_nn)
 
-    err_per_frame = [np.abs(U_hist[:, :, :, k] - nn_frames[k]).mean() for k in range(n_frames)]
+    compare_indices = [i * cfg.njp for i in range(len(nn_frames))]
+    err_per_frame = [np.abs(U_hist[:, :, :, k] - nn_frames[i]).mean() for i, k in enumerate(compare_indices)]
     print(f"  L1 error mean: {np.mean(err_per_frame):.6f}, max frame: {np.max(err_per_frame):.6f}")
 
     comp_names = ["h - h0", "qx", "qy"]
@@ -294,25 +302,27 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
         clims.append((lo - pad, hi + pad))
 
     os.makedirs(out_dir, exist_ok=True)
-    for k in range(n_frames):
-        fig, axes = plt.subplots(2, 3, figsize=(12, 8))
+    n_compare = len(nn_frames)
+    for i in range(n_compare):
+        k = i * cfg.njp
+        fig, axes = plt.subplots(2, 3, figsize=(12, 8), constrained_layout=True)
         for c in range(3):
             pc0 = axes[0, c].pcolormesh(xx, yy, U_hist[:, :, c, k].T, shading="auto")
             axes[0, c].set_title(f"Spectral {comp_names[c]}")
-            pc1 = axes[1, c].pcolormesh(xx, yy, nn_frames[k][:, :, c].T, shading="auto")
+            pc1 = axes[1, c].pcolormesh(xx, yy, nn_frames[i][:, :, c].T, shading="auto")
             axes[1, c].set_title(f"NN {comp_names[c]}")
             pc0.set_clim(clims[c])
             pc1.set_clim(clims[c])
+            fig.colorbar(pc0, ax=[axes[0, c], axes[1, c]], label=comp_names[c])
         time_spec = spectral_time_per_frame[k]
-        time_nn = nn_time_list[k]
+        time_nn = nn_time_list[i]
         speedup = time_spec / time_nn if time_nn > 0 else float("inf")
         fig.text(0.02, 0.98, f"Spectral: {time_spec:.3f} s\nNN: {time_nn:.4f} s\nSpeedup: {speedup:.1f}×",
                  fontsize=9, verticalalignment="top", bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
-        plt.suptitle(f"t = {t_hist[k]:.3f}")
-        plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, f"t{k}.png"), dpi=120)
+        plt.suptitle(f"t = {t_hist[k]:.3f} (frame {k})")
+        plt.savefig(os.path.join(out_dir, f"t{i}.png"), dpi=120)
         plt.close()
-    print(f"Saved {n_frames} figures to {out_dir}/  Spectral: {spectral_time:.3f} s  NN: {nn_time_list[-1]:.4f} s")
+    print(f"Saved {n_compare} figures to {out_dir}/  Spectral: {spectral_time:.3f} s  NN: {nn_time_list[-1]:.4f} s")
 
 
 def main():

@@ -179,21 +179,40 @@ def main():
         component_weights = (1.0 / std_per_ch).to(device)
         print(f"Output scale (std per ch): {std_per_ch.cpu().numpy()} -> loss weights = 1/std", flush=True)
         model = ShrinkCNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
-        lam_tv = torch.tensor([1e-2, 0, 0], device=device)
+        lam_tv = torch.tensor(getattr(cfg, "lam_tv", [1e-2, 0, 0]), device=device, dtype=torch.float32)
+        lam_sob = getattr(cfg, "lam_sob", 0.0)
         criterion = torch.nn.L1Loss(reduction="none")
+
+        def _sob_loss(out, t):
+            """Gradient-matching (Sobolev): match d/dx and d/dy of output to target."""
+            out_dx = out[:, :, 1:, :] - out[:, :, :-1, :]
+            out_dy = out[:, :, :, 1:] - out[:, :, :, :-1]
+            t_dx = t[:, :, 1:, :] - t[:, :, :-1, :]
+            t_dy = t[:, :, :, 1:] - t[:, :, :, :-1]
+            return (out_dx - t_dx).pow(2).mean() + (out_dy - t_dy).pow(2).mean()
+
         def train_step(m, i, t):
             out = m(i)
             diff = criterion(out, t)
             data_loss_vec = diff.mean(dim=(0, 2, 3))
             tv_vec = tv_isotropic_per_channel(out)
-            return (data_loss_vec * component_weights + lam_tv * tv_vec).sum()
+            loss = (data_loss_vec * component_weights + lam_tv * tv_vec).sum()
+            if lam_sob > 0:
+                loss = loss + lam_sob * _sob_loss(out, t)
+            return loss
+
         def test_step(m, i, t):
             out = m(i)
             diff = criterion(out, t)
             data_loss_vec = diff.mean(dim=(0, 2, 3))
             tv_vec = tv_isotropic_per_channel(out)
-            return (data_loss_vec * component_weights + lam_tv * tv_vec).sum().item()
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+            loss = (data_loss_vec * component_weights + lam_tv * tv_vec).sum().item()
+            if lam_sob > 0:
+                loss = loss + lam_sob * _sob_loss(out, t).item()
+            return loss
+
+        initial_lr = cfg.lr_schedule[0][1]
+        optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr)
         train_loss_history, test_loss_history = run_epochs(
             model, train_loader, test_loader, optimizer, cfg.num_epochs, cfg.lr_schedule, device, train_step, test_step,
             flush_print=True,
