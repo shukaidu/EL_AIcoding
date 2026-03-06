@@ -1,9 +1,4 @@
-"""
-Single data generation entry. Run from repo root:
-  python gen_data.py --problem burgers_1d
-  python gen_data.py --problem wave_2d_linear
-  python gen_data.py --problem wave_2d_nonlinear
-"""
+"""Gen data: python gen_data.py --problem burgers_1d|wave_2d_linear|wave_2d_nonlinear"""
 import os
 import sys
 import argparse
@@ -201,18 +196,11 @@ def run_wave_2d_nonlinear(data_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--problem", required=True, choices=["burgers_1d", "wave_2d_linear", "wave_2d_nonlinear"])
-    args = parser.parse_args()
-    problem = args.problem
+    p = argparse.ArgumentParser()
+    p.add_argument("--problem", required=True, choices=["burgers_1d", "wave_2d_linear", "wave_2d_nonlinear"])
+    problem = p.parse_args().problem
     data_dir = os.path.join(_repo_root, "data", problem)
-
-    if problem == "burgers_1d":
-        run_burgers_1d(data_dir)
-    elif problem == "wave_2d_linear":
-        run_wave_2d_linear(data_dir)
-    else:
-        run_wave_2d_nonlinear(data_dir)
+    {"burgers_1d": run_burgers_1d, "wave_2d_linear": run_wave_2d_linear, "wave_2d_nonlinear": run_wave_2d_nonlinear}[problem](data_dir)
 
 
 if __name__ == "__main__":

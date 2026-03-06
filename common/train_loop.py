@@ -1,11 +1,9 @@
-"""Generic training loop and training history plot."""
-import sys
+"""Device selection and training curve plot."""
 import os
 import torch
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy.io import savemat
 
 
 def get_device():
@@ -16,19 +14,17 @@ def get_device():
     return torch.device("cpu")
 
 
-def plot_training_history(train_loss_history, test_loss_history, save_path):
-    """Save training_history.png (log scale)."""
-    os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
-    epochs = range(1, len(train_loss_history) + 1)
+def plot_training_history(hist_tr, hist_te, path):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    n = len(hist_tr)
     plt.figure(figsize=(7, 4))
-    plt.plot(epochs, train_loss_history, label="Train loss", linewidth=0.8)
-    plt.plot(epochs, test_loss_history, label="Test loss", linewidth=0.8)
+    plt.plot(range(1, n + 1), hist_tr, label="Train", lw=0.8)
+    plt.plot(range(1, n + 1), hist_te, label="Test", lw=0.8)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.title("Training and testing error history")
     plt.legend()
     plt.yscale("log")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
+    plt.savefig(path, dpi=150)
     plt.close()

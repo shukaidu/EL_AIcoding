@@ -135,7 +135,7 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
 \end{figure}
 
 \subsection{1D Burgers: FV vs.\ NN}
-Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (reported run): FV total $\approx 4.22$\,s, NN total $\approx 0.30$\,s (speedup $\approx 14\times$).
+Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (reported run): FV total $\approx 4.02$\,s, NN total $\approx 0.31$\,s (speedup $\approx 13\times$).
 
 \begin{figure}[H]
   \centering
@@ -155,7 +155,7 @@ Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0},
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (reported run): Spectral $\approx 0.84$\,s, NN $\approx 0.11$\,s.
+Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (reported run): Spectral $\approx 0.82$\,s, NN $\approx 0.11$\,s.
 
 \begin{figure}[H]
   \centering
@@ -175,7 +175,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 6 frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}). Reference: spectral; surrogate: ShrinkCNN. L1 error (mean over frames) $\approx 0.011$ in the reported run. Runtimes: Spectral $\approx 1.88$\,s, NN $\approx 0.17$\,s.
+Comparison at 13 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: ShrinkCNN. L1 error (mean over frames) $\approx 0.016$ in the reported run. Runtimes: Spectral $\approx 115$\,s, NN $\approx 2.73$\,s.
 
 \begin{figure}[H]
   \centering

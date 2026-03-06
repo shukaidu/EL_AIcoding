@@ -1,49 +1,29 @@
-"""Unified save/load checkpoint (MLP: optional hidden_size, num_layers; CNN: optional base)."""
+"""Save/load checkpoint; extra kwargs stored for loading."""
 import torch
 
 
-def save_checkpoint(
-    model,
-    optimizer,
-    epoch,
-    train_loss_history,
-    test_loss_history,
-    filename,
-    hidden_size=None,
-    num_hidden_layers=None,
-    num_layers=None,
-    base=None,
-):
-    checkpoint = {
+def save_checkpoint(model, optimizer, epoch, hist_tr, hist_te, path, **extra):
+    ckpt = {
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "epoch": epoch,
-        "train_loss_history": train_loss_history,
-        "test_loss_history": test_loss_history,
+        "train_loss_history": hist_tr,
+        "test_loss_history": hist_te,
     }
-    if hidden_size is not None:
-        checkpoint["hidden_size"] = hidden_size
-    if num_hidden_layers is not None:
-        checkpoint["num_hidden_layers"] = num_hidden_layers
-    if num_layers is not None:
-        checkpoint["num_layers"] = num_layers
-    if base is not None:
-        checkpoint["base"] = base
-    torch.save(checkpoint, filename)
+    ckpt.update({k: v for k, v in extra.items() if v is not None})
+    torch.save(ckpt, path)
 
 
-def load_checkpoint(model, optimizer, filename):
-    checkpoint = torch.load(filename, map_location=torch.device("cpu"))
-    model.load_state_dict(checkpoint["model_state_dict"])
-    if optimizer is not None and "optimizer_state_dict" in checkpoint:
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    epoch = checkpoint.get("epoch", 0)
-    train_loss_history = checkpoint.get("train_loss_history", [])
-    test_loss_history = checkpoint.get("test_loss_history", [])
-    extra = {
-        "hidden_size": checkpoint.get("hidden_size"),
-        "num_hidden_layers": checkpoint.get("num_hidden_layers"),
-        "num_layers": checkpoint.get("num_layers"),
-        "base": checkpoint.get("base", 32),
-    }
-    return model, optimizer, epoch, train_loss_history, test_loss_history, extra
+def load_checkpoint(model, optimizer, path):
+    ckpt = torch.load(path, map_location="cpu")
+    model.load_state_dict(ckpt["model_state_dict"])
+    if optimizer is not None and "optimizer_state_dict" in ckpt:
+        optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+    return (
+        model, optimizer,
+        ckpt.get("epoch", 0),
+        ckpt.get("train_loss_history", []),
+        ckpt.get("test_loss_history", []),
+        {"hidden_size": ckpt.get("hidden_size"), "num_hidden_layers": ckpt.get("num_hidden_layers"),
+         "num_layers": ckpt.get("num_layers"), "base": ckpt.get("base", 32)},
+    )

@@ -1,9 +1,4 @@
-"""
-Single comparison entry. Run from repo root:
-  python compare.py --problem burgers_1d
-  python compare.py --problem wave_2d_linear
-  python compare.py --problem wave_2d_nonlinear
-"""
+"""Compare: python compare.py --problem burgers_1d|wave_2d_linear|wave_2d_nonlinear"""
 import os
 import sys
 import re
@@ -326,18 +321,13 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--problem", required=True, choices=["burgers_1d", "wave_2d_linear", "wave_2d_nonlinear"])
-    args = parser.parse_args()
-    problem = args.problem
+    p = argparse.ArgumentParser()
+    p.add_argument("--problem", required=True, choices=["burgers_1d", "wave_2d_linear", "wave_2d_nonlinear"])
+    problem = p.parse_args().problem
     data_dir = os.path.join(_repo_root, "data", problem)
     out_dir = os.path.join(data_dir, "compare")
-    if problem == "burgers_1d":
-        _compare_burgers_1d(data_dir, out_dir)
-    elif problem == "wave_2d_linear":
-        _compare_wave_2d_linear(data_dir, out_dir)
-    else:
-        _compare_wave_2d_nonlinear(data_dir, out_dir)
+    fns = {"burgers_1d": _compare_burgers_1d, "wave_2d_linear": _compare_wave_2d_linear, "wave_2d_nonlinear": _compare_wave_2d_nonlinear}
+    fns[problem](data_dir, out_dir)
 
 
 if __name__ == "__main__":
