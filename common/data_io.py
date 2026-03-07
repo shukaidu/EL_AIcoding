@@ -6,10 +6,18 @@ from sklearn.model_selection import train_test_split
 
 def _loaders(X, Y, device, b_size, test_split=0.2):
     Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=test_split, random_state=42)
-    tr_ds = torch.utils.data.TensorDataset(torch.tensor(Xtr, dtype=torch.float32).to(device), torch.tensor(Ytr, dtype=torch.float32).to(device))
-    te_ds = torch.utils.data.TensorDataset(torch.tensor(Xte, dtype=torch.float32).to(device), torch.tensor(Yte, dtype=torch.float32).to(device))
-    return (torch.utils.data.DataLoader(tr_ds, batch_size=b_size, shuffle=True),
-            torch.utils.data.DataLoader(te_ds, batch_size=b_size, shuffle=False))
+    tr_ds = torch.utils.data.TensorDataset(
+        torch.tensor(Xtr, dtype=torch.float32).to(device),
+        torch.tensor(Ytr, dtype=torch.float32).to(device),
+    )
+    te_ds = torch.utils.data.TensorDataset(
+        torch.tensor(Xte, dtype=torch.float32).to(device),
+        torch.tensor(Yte, dtype=torch.float32).to(device),
+    )
+    return (
+        torch.utils.data.DataLoader(tr_ds, batch_size=b_size, shuffle=True),
+        torch.utils.data.DataLoader(te_ds, batch_size=b_size, shuffle=False),
+    )
 
 
 def load_mat(path, device, b_size=100, test_split=0.2):

@@ -14,16 +14,6 @@ def save_checkpoint(model, optimizer, epoch, hist_tr, hist_te, path, **extra):
     torch.save(ckpt, path)
 
 
-def load_checkpoint(model, optimizer, path):
+def load_checkpoint(model, path):
     ckpt = torch.load(path, map_location="cpu")
     model.load_state_dict(ckpt["model_state_dict"])
-    if optimizer is not None and "optimizer_state_dict" in ckpt:
-        optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-    return (
-        model, optimizer,
-        ckpt.get("epoch", 0),
-        ckpt.get("train_loss_history", []),
-        ckpt.get("test_loss_history", []),
-        {"hidden_size": ckpt.get("hidden_size"), "num_hidden_layers": ckpt.get("num_hidden_layers"),
-         "num_layers": ckpt.get("num_layers"), "base": ckpt.get("base", 32)},
-    )

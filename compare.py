@@ -23,7 +23,7 @@ def _speedup_str(time_ref, time_nn):
 
 
 def _compare_burgers_1d(data_dir, out_dir):
-    from pde.burgers_1d import gen_dist, build_diffusion_matrix, integrate_burger
+    from pde.burgers_1d import gen_dist_1d, build_diffusion_matrix, integrate_burger
     import config.burgers_1d_config as cfg
     from common.models import MLP
     from ml.snapshot import load_checkpoint
@@ -36,7 +36,7 @@ def _compare_burgers_1d(data_dir, out_dir):
     n_times = len(times)
     xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
     np.random.seed(cfg.compare_seed)
-    u0, _ = gen_dist(nx, alpha)
+    u0 = gen_dist_1d(nx, alpha)
     u0 = u0 + u_mean
 
     u_fv = u0.copy()
@@ -66,8 +66,8 @@ def _compare_burgers_1d(data_dir, out_dir):
         return
     ckpt = torch.load(model_path, map_location="cpu")
     N_i, N_o = 2 * nst + nwd, nwd
-    model = MLP(N_i, N_o, hidden_size=ckpt.get("hidden_size", 256), num_layers=ckpt.get("num_layers", 6), activation="relu").to(device)
-    load_checkpoint(model, None, model_path)
+    model = MLP(N_i, N_o, hidden_size=ckpt.get("hidden_size", 256), num_layers=ckpt.get("num_layers", 6)).to(device)
+    load_checkpoint(model, model_path)
     model.eval()
 
     def integrate_nn(model, u, nwd, nst, device):
@@ -137,8 +137,8 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     ckpt = torch.load(model_path, map_location="cpu")
     N_i = 2 * cfg.patch_side ** 2
     N_o = 2 * cfg.nwd ** 2
-    model = MLP(N_i, N_o, hidden_size=ckpt.get("hidden_size", 256), num_layers=ckpt.get("num_layers", 5), activation="identity").to(device)
-    load_checkpoint(model, None, model_path)
+    model = MLP(N_i, N_o, hidden_size=ckpt.get("hidden_size", 256), num_layers=ckpt.get("num_layers", 5)).to(device)
+    load_checkpoint(model, model_path)
     model.eval()
 
     t0_spec = time.perf_counter()
@@ -229,7 +229,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
 def _compare_wave_2d_nonlinear(data_dir, out_dir):
     from pde.wave_2d_nonlinear import wave2d_spectral
     import config.wave_2d_nonlinear_config as cfg
-    from common.models import ShrinkCNN
+    from common.models import CNN
     from ml.snapshot import load_checkpoint
 
     nwd = cfg.nwd
@@ -244,8 +244,8 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
     patch_side = nwd + 4 * max_idx
     nst = (patch_side - nwd) // 2
     base = ckpt.get("base", 32)
-    model = ShrinkCNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
-    load_checkpoint(model, None, model_path)
+    model = CNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
+    load_checkpoint(model, model_path)
     model.eval()
 
     def boundary_ext(u, nst):

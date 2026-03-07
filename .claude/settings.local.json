@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(/c/Users/dushu/anaconda3/python.exe:*)",
+      "Bash(jobs:*)"
+    ]
+  }
+}

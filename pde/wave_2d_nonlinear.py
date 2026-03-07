@@ -5,19 +5,20 @@ State: U = (h, qx=hu, qy=hv). Python port of wave2d_spectral.m.
 import numpy as np
 
 
-def gen_ah_four(xgrid, ygrid, ord_decay):
-    """Random field with Fourier decay ~ 1/k^ord_decay. Returns real 2D array (m,n)."""
+def gen_dist_2d(xgrid, ygrid, alpha):
+    """Random smooth 2D field with Fourier decay ~ 1/(1+|k|^alpha). Returns real 2D array (m,n)."""
     m, n = len(xgrid), len(ygrid)
-    kkm = np.arange(-m // 2, m // 2)
-    kkn = np.arange(-n // 2, n // 2)
-    kkmn = 1.0 + (np.sqrt((kkm[:, None]) ** 2 + (kkn[None, :]) ** 2) ** ord_decay)
-    rng = np.random.default_rng()
-    Y = (rng.standard_normal((m, n)) + 1j * rng.standard_normal((m, n))) / kkmn
+    km = np.arange(-m // 2, m // 2)
+    kn = np.arange(-n // 2, n // 2)
+    decay = 1.0 + np.sqrt(km[:, None] ** 2 + kn[None, :] ** 2) ** alpha
+    Y = (np.random.randn(m, n) + 1j * np.random.randn(m, n)) / decay
     Y = Y * m * n
-    Y = np.fft.ifftshift(np.fft.ifftshift(Y, 0), 1)
+    Y = np.fft.ifftshift(Y)
     X = np.real(np.fft.ifft2(Y))
-    X = (X - np.mean(X)) / (np.max(np.abs(X)) + 1e-12)
-    X = 0.5 * X
+    X -= np.mean(X)
+    max_abs = np.max(np.abs(X))
+    if max_abs > 0:
+        X = 0.9 * X / max_abs
     return X
 
 
@@ -88,9 +89,9 @@ def wave2d_spectral(
     # Initial condition
     if initial_condition == "ring":
         h = h0 + 0.1 * np.exp(-50 * ((xx - Lx / 3) ** 2 + (yy - Ly / 2) ** 2))
-        psi = 0.5 * gen_ah_four(xgrid, ygrid, 3.0)
+        psi = 0.5 * gen_dist_2d(xgrid, ygrid, 3.0)
     elif initial_condition == "random":
-        psi = 0.5 * gen_ah_four(xgrid, ygrid, 2.5)
+        psi = 0.5 * gen_dist_2d(xgrid, ygrid, 2.5)
         h = h0 + 0.0 * psi
     else:
         raise ValueError(f"Unknown initial_condition: {initial_condition}")

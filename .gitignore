@@ -1,9 +1,6 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.Python
 *.so
 .venv/
 venv/
@@ -13,19 +10,10 @@ env/
 *.mat
 *.pth
 
-# Unified data dir: generated files (gen_data, train, compare)
-data/*/*.mat
-data/*/*.pth
+# Generated outputs (regenerate with pipeline)
 data/*/training_history.png
 data/*/compare/
-
-# Legacy output figures (regenerate with compare scripts)
-**/compare_spectral_nn/*.png
-**/compare_fv_nn/*.png
-
-# Training history images (regenerate with train)
-**/ML/training_history.png
-**/ml/training_history.png
+latex/figures/
 
 # IDE / OS
 .idea/
@@ -35,4 +23,3 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb_checkpoints

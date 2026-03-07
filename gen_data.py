@@ -14,11 +14,11 @@ def _burgers_1d_single_trajectory(args):
     """Top-level for multiprocessing pickle. args = (seed, per_traj). Returns (inputs_list, outputs_list)."""
     seed, per_traj = args
     import config.burgers_1d_config as cfg
-    from pde.burgers_1d import gen_dist, build_diffusion_matrix, integrate_burger
+    from pde.burgers_1d import gen_dist_1d, build_diffusion_matrix, integrate_burger
     np.random.seed(seed)
     nx, nt = cfg.nx, cfg.nt
     njp, nst, nwd = cfg.njp, cfg.nst, cfg.nwd
-    u0, _ = gen_dist(nx, cfg.alpha)
+    u0 = gen_dist_1d(nx, cfg.alpha)
     u0 = u0 + cfg.u_mean
     u = u0.copy()
     u_history = np.zeros((nx, nt + 1), dtype=float)

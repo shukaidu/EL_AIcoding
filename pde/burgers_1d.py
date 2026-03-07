@@ -3,28 +3,18 @@ from scipy.sparse import diags, eye
 from scipy.sparse.linalg import spsolve
 
 
-def gen_dist(N: int, alpha: float):
-    """
-    Python translation of genDist.m.
-    Generates a random smooth initial condition using a Fourier series
-    with coefficient decay ~ (1 + k^2)^(-alpha/2).
-    """
-    x = np.linspace(1.0 / (2 * N), 1.0 - 1.0 / (2 * N), N)
-    f = np.zeros_like(x)
-
-    for k in range(0, N + 1):
-        add = np.random.randn() * np.cos(2 * np.pi * k * x) + np.random.randn() * np.sin(
-            2 * np.pi * k * x
-        )
-        add /= (1.0 + k**2) ** (alpha / 2.0)
-        f += add
-
+def gen_dist_1d(N: int, alpha: float):
+    """Random smooth 1D field with Fourier decay ~ 1/(1+|k|^alpha). Returns (f, x)."""
+    k = np.arange(-N // 2, N // 2)
+    decay = 1.0 + np.abs(k) ** alpha
+    Y = (np.random.randn(N) + 1j * np.random.randn(N)) / decay
+    Y = np.fft.ifftshift(Y)
+    f = np.real(np.fft.ifft(Y)) * N
     f -= f.mean()
     max_abs = np.max(np.abs(f))
     if max_abs > 0:
         f = 0.9 * f / max_abs
-
-    return f, x
+    return f
 
 
 def build_diffusion_matrix(nx: int, dt: float, dx: float, nu: float):
@@ -104,7 +94,7 @@ def run_reference_solver():
     alpha, u_mean, nu = cfg.alpha, cfg.u_mean, cfg.nu
 
     xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
-    u0, _ = gen_dist(nx, alpha)
+    u0 = gen_dist_1d(nx, alpha)
     u0 = u0 + u_mean
 
     u = u0.copy()

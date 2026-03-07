@@ -11,28 +11,22 @@ _repo_root = os.path.dirname(_ml_dir)
 sys.path.insert(0, _repo_root)
 
 from common.data_io import load_mat, load_wave_2d_nonlinear
-from common.models import MLP, ShrinkCNN
+from common.models import MLP, CNN
 from common.train_loop import get_device, plot_training_history
 from ml.snapshot import save_checkpoint
 
 
-def get_lr(epoch, lr_schedule):
-    for e, lr in lr_schedule:
-        if epoch <= e:
-            return lr
-    return lr_schedule[-1][1]
-
-
-def run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule, device, train_step_fn, test_step_fn):
+def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule):
+    crit = torch.nn.L1Loss(reduction="mean")
     hist_tr, hist_te = [], []
     for epoch in range(1, num_epochs + 1):
-        lr = get_lr(epoch, lr_schedule)
+        lr = next(lr for e, lr in lr_schedule if epoch <= e)
         for pg in optimizer.param_groups:
             pg["lr"] = lr
         model.train()
         tr = 0.0
         for i, t in train_loader:
-            loss = train_step_fn(model, i, t)
+            loss = crit(model(i), t)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -41,26 +35,19 @@ def run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_sched
         hist_tr.append(tr)
         model.eval()
         with torch.no_grad():
-            te = sum(test_step_fn(model, i, t) for i, t in test_loader) / len(test_loader)
+            te = sum(crit(model(i), t).item() for i, t in test_loader) / len(test_loader)
         hist_te.append(te)
         print(f"Epoch [{epoch}/{num_epochs}], lr={lr:.0e}, Train: {tr:.6f}, Test: {te:.6f}")
     return hist_tr, hist_te
 
 
-def save_artifacts(model, optimizer, num_epochs, hist_tr, hist_te, data_dir, cfg, **extra):
-    save_checkpoint(model, optimizer, num_epochs, hist_tr, hist_te, os.path.join(data_dir, cfg.model_pth), **extra)
+def _run(model, train_loader, test_loader, cfg, data_dir, **ckpt_extra):
+    opt = torch.optim.Adam(model.parameters(), lr=cfg.lr_schedule[0][1])
+    hist_tr, hist_te = _run_epochs(model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule)
+    save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te, os.path.join(data_dir, cfg.model_pth), **ckpt_extra)
     savemat(os.path.join(data_dir, cfg.error_mat), {"train_err": hist_tr, "test_err": hist_te})
     plot_training_history(hist_tr, hist_te, os.path.join(data_dir, "training_history.png"))
     print(f"Saved {os.path.join(data_dir, cfg.model_pth)}")
-
-
-def _run(model, train_loader, test_loader, cfg, data_dir, device, **ckpt_extra):
-    crit = torch.nn.L1Loss(reduction="mean")
-    opt = torch.optim.Adam(model.parameters(), lr=cfg.lr_schedule[0][1])
-    train_step = lambda m, i, t: crit(m(i), t)
-    test_step = lambda m, i, t: crit(m(i), t).item()
-    hist_tr, hist_te = run_epochs(model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule, device, train_step, test_step)
-    save_artifacts(model, opt, cfg.num_epochs, hist_tr, hist_te, data_dir, cfg, **ckpt_extra)
 
 
 def main():
@@ -74,19 +61,18 @@ def main():
 
     # burgers_1d and wave_2d_linear both use MLP + flat .mat loader
     _MLP_PROBLEMS = {
-        "burgers_1d": ("config.burgers_1d_config", "relu"),
-        "wave_2d_linear": ("config.wave_2d_linear_config", "identity"),
+        "burgers_1d": "config.burgers_1d_config",
+        "wave_2d_linear": "config.wave_2d_linear_config",
     }
     if problem in _MLP_PROBLEMS:
-        cfg_module, activation = _MLP_PROBLEMS[problem]
-        cfg = importlib.import_module(cfg_module)
+        cfg = importlib.import_module(_MLP_PROBLEMS[problem])
         path = os.path.join(data_dir, cfg.data_mat)
         if not os.path.isfile(path):
             print(f"Data not found: {path}. Run: python gen_data.py --problem {problem}")
             return
         tl, vl, N_i, N_o, _ = load_mat(path, device, b_size=cfg.b_size)
-        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation=activation).to(device)
-        _run(model, tl, vl, cfg, data_dir, device, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers)
+        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers).to(device)
+        _run(model, tl, vl, cfg, data_dir, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers)
         return
 
     if problem == "wave_2d_nonlinear":
@@ -96,8 +82,8 @@ def main():
             print(f"Data not found: {path}. Run: python gen_data.py --problem wave_2d_nonlinear")
             return
         tl, vl, _, C_in, C_out, Nx, Ny, nx, ny = load_wave_2d_nonlinear(path, device, b_size=cfg.b_size)
-        model = ShrinkCNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
-        _run(model, tl, vl, cfg, data_dir, device, base=cfg.base)
+        model = CNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
+        _run(model, tl, vl, cfg, data_dir, base=cfg.base)
         return
 
 

@@ -1,4 +1,4 @@
-"""ShrinkCNN: patch in -> patch out, each block shrinks H,W by 4. L = (Nx - nx)//4."""
+"""CNN: patch in -> patch out, each block shrinks H,W by 4. L = (Nx - nx)//4."""
 import torch.nn as nn
 
 
@@ -13,7 +13,7 @@ class ResBlock(nn.Module):
         return y + x[:, :, 2:-2, 2:-2]
 
 
-class ShrinkCNN(nn.Module):
+class CNN(nn.Module):
     def __init__(self, Cin=3, Cout=3, base=32, Nx=64, nx=32):
         super().__init__()
         L = (Nx - nx) // 4

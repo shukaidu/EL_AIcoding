@@ -23,9 +23,9 @@ dt_samp = TSCREEN * dt_internal        # time between saved frames
 nwd = 32
 njp = 2
 
-# Patch stencil: halo per side from CFL (wave travels ~c over njp*dt_samp); ShrinkCNN needs (patch_side - nwd) divisible by 4 and >= 4
+# Patch stencil: halo per side from CFL (wave travels ~c over njp*dt_samp); CNN needs (patch_side - nwd) divisible by 4 and >= 4
 nst_min = c * njp * dt_samp / dx
-nst = max(2, int(np.ceil(nst_min / 2)) * 2)   # smallest even integer >= nst_min, at least 2 for ShrinkCNN
+nst = max(2, int(np.ceil(nst_min / 2)) * 2)   # smallest even integer >= nst_min, at least 2 for CNN
 patch_side = nwd + 2 * nst
 
 
@@ -38,7 +38,7 @@ ic_list = ["random"]
 # Training
 b_size = 128
 num_epochs = 80   # fewer epochs, better schedule → similar or better error, faster
-base = 32        # ShrinkCNN base channels (keep moderate size)
+base = 32        # CNN base channels (keep moderate size)
 lr_schedule = [(40, 3e-4), (70, 1e-4), (80, 1e-5)]
 
 # Compare (reference vs NN rollout)

@@ -1,15 +1,14 @@
-"""MLP: activation 'relu' (Burgers) or 'identity' (2D linear)."""
+"""MLP with ReLU activations."""
 import torch.nn as nn
 
 
 class MLP(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size=256, num_layers=5, activation="relu"):
+    def __init__(self, input_size, output_size, hidden_size=256, num_layers=5):
         super().__init__()
-        act = nn.ReLU() if activation == "relu" else nn.Identity()
         layers = []
         d = input_size
         for _ in range(num_layers):
-            layers += [nn.Linear(d, hidden_size), act]
+            layers += [nn.Linear(d, hidden_size), nn.ReLU()]
             d = hidden_size
         layers.append(nn.Linear(hidden_size, output_size))
         self.net = nn.Sequential(*layers)
