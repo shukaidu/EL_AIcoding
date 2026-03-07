@@ -41,6 +41,7 @@ b_size = 128
 num_epochs = 2500
 hidden_size = 256
 num_layers = 5
+activation = "linear"  # relu|tanh|gelu|linear
 lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 
 # Compare (reference vs NN rollout)
@@ -52,3 +53,6 @@ compare_seed = 42
 data_mat = "data_wave.mat"
 model_pth = "data_wave_model.pth"
 error_mat = "data_wave_error.mat"
+
+
+

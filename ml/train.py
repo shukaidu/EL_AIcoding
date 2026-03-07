@@ -71,8 +71,9 @@ def main():
             print(f"Data not found: {path}. Run: python gen_data.py --problem {problem}")
             return
         tl, vl, N_i, N_o, _ = load_mat(path, device, b_size=cfg.b_size)
-        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers).to(device)
-        _run(model, tl, vl, cfg, data_dir, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers)
+        activation = getattr(cfg, "activation", "relu")
+        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation=activation).to(device)
+        _run(model, tl, vl, cfg, data_dir, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation=activation)
         return
 
     if problem == "wave_2d_nonlinear":
@@ -89,3 +90,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

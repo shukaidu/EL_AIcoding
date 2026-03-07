@@ -18,7 +18,7 @@
 \maketitle
 
 \begin{abstract}
-We report numerical experiments for data-driven surrogate models of three PDEs: (1)~1D inviscid Burgers equation (finite-volume reference vs.\ MLP); (2)~2D linear wave equation (Fourier spectral reference vs.\ MLP); (3)~2D nonlinear rotating shallow water (Fourier spectral reference vs.\ ShrinkCNN). For each problem we generate training data from the reference solver, train a neural network, and compare reference and NN rollouts in time. Training curves and comparison figures are included. All configuration parameters are centralized in config files; PDE and training pipelines are unified under a single codebase.
+We report numerical experiments for data-driven surrogate models of three PDEs: (1)~1D viscous Burgers equation (finite-volume reference vs.\ MLP); (2)~2D linear wave equation (Fourier spectral reference vs.\ MLP); (3)~2D nonlinear rotating shallow water (Fourier spectral reference vs.\ CNN). For each problem we generate training data from the reference solver, train a neural network, and compare reference and NN rollouts in time. Training curves and comparison figures are included. All configuration parameters are centralized in config files; PDE and training pipelines are unified under a single codebase.
 \end{abstract}
 
 \section{Background}\label{sec:background}
@@ -28,9 +28,9 @@ The goal is to learn a \emph{local} map (one time step or a few) on a small spat
 
 \subsection{Three test cases}
 \begin{itemize}
-  \item \textbf{1D Burgers (inviscid):} $u_t + u u_x = 0$ on $[0,L]$ with periodic BC. Reference: finite-volume Godunov flux. NN: MLP mapping a 1D patch (input length $2n_{\mathrm{st}}+n_{\mathrm{wd}}$) to interior ($n_{\mathrm{wd}}$ cells) over one step of $n_{\mathrm{jp}}$ time steps.
+  \item \textbf{1D Burgers (viscous):} $u_t + u u_x = \nu u_{xx}$ on $[0,L]$ with periodic BC. Reference: finite-volume Godunov flux + implicit diffusion. NN: MLP mapping a 1D patch (input length $2n_{\mathrm{st}}+n_{\mathrm{wd}}$) to interior ($n_{\mathrm{wd}}$ cells) over one step of $n_{\mathrm{jp}}$ time steps.
   \item \textbf{2D linear wave:} $u_{tt} = c^2(u_{xx}+u_{yy})$ with periodic BC. Reference: Fourier pseudo-spectral, exact modal time step. NN: MLP mapping two channels (displacement and velocity) on a 2D patch to the interior over one frame.
-  \item \textbf{2D nonlinear shallow water:} Rotating shallow water in Fourier space with RK4. State $(h,q_x,q_y)$. Reference: spectral; NN: ShrinkCNN (patch in, patch out) with optional TV regularization in the loss.
+  \item \textbf{2D nonlinear shallow water:} Rotating shallow water in Fourier space with RK4. State $(h,q_x,q_y)$. Reference: spectral; NN: CNN (patch in, patch out) with optional TV regularization in the loss.
 \end{itemize}
 
 \section{Experimental parameters}\label{sec:parameters}
@@ -95,16 +95,16 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     \toprule
     Parameter & Value \\
     \midrule
-    Grid $n_x\times n_y$ & $128\times 128$ \\
+    Grid $n_x\times n_y$ & $256\times 256$ \\
     $L_x=L_y$ & $2\pi$ \\
     $g$, $h_0$ & 9.8, 1.0 \\
-    $T_{\mathrm{screen}}$ & 20 \\
+    $T_{\mathrm{screen}}$ & 10 \\
     $n_{\mathrm{wd}}$ & 32 \\
     Compare IC & random \\
     \midrule
     Training samples & 6000 \\
     Epochs & 80 \\
-    ShrinkCNN base channels & 32 \\
+    CNN base channels & 32 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -135,7 +135,7 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
 \end{figure}
 
 \subsection{1D Burgers: FV vs.\ NN}
-Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (reported run): FV total $\approx 3.94$\,s, NN total $\approx 0.35$\,s (speedup $\approx 11.3\times$).
+Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $4.092$\,s, NN total $0.3364$\,s (speedup $12.16\times$).
 
 \begin{figure}[H]
   \centering
@@ -155,7 +155,7 @@ Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0},
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (reported run): Spectral $\approx 0.80$\,s, NN $\approx 0.10$\,s (speedup $\approx 8.2\times$).
+Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $0.786$\,s, NN $0.2028$\,s (speedup $3.88\times$).
 
 \begin{figure}[H]
   \centering
@@ -175,7 +175,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 13 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: ShrinkCNN. L1 error (mean over frames) $\approx 0.015$ in the reported run. Runtimes: Spectral $\approx 27.1$\,s, NN $\approx 0.72$\,s (speedup $\approx 37.8\times$).
+Comparison at 13 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.014588$ (max frame $0.024208$). Runtimes (this run): Spectral $28.969$\,s, NN $0.8768$\,s (speedup $33.04\times$).
 
 \begin{figure}[H]
   \centering
@@ -197,3 +197,5 @@ Comparison at 13 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{com
 \section{Conclusion}\label{sec:conclusion}
 The pipelines for 1D Burgers, 2D linear wave, and 2D nonlinear shallow water run successfully with a unified workflow: \texttt{gen\_data.py}, \texttt{ml.train}, and \texttt{compare.py} are invoked with \texttt{--problem} to select the case. All configuration is in \texttt{config/}; PDE modules take parameters from config and contain no duplicate defaults. The reported figures show that the NN surrogates track the reference solutions and achieve noticeable speedups in the comparison runs.
 \end{document}
+
+

@@ -66,7 +66,12 @@ def _compare_burgers_1d(data_dir, out_dir):
         return
     ckpt = torch.load(model_path, map_location="cpu")
     N_i, N_o = 2 * nst + nwd, nwd
-    model = MLP(N_i, N_o, hidden_size=ckpt.get("hidden_size", 256), num_layers=ckpt.get("num_layers", 6)).to(device)
+    model = MLP(
+        N_i, N_o,
+        hidden_size=ckpt.get("hidden_size", 256),
+        num_layers=ckpt.get("num_layers", 6),
+        activation=ckpt.get("activation", getattr(cfg, "activation", "relu")),
+    ).to(device)
     load_checkpoint(model, model_path)
     model.eval()
 
@@ -137,7 +142,12 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     ckpt = torch.load(model_path, map_location="cpu")
     N_i = 2 * cfg.patch_side ** 2
     N_o = 2 * cfg.nwd ** 2
-    model = MLP(N_i, N_o, hidden_size=ckpt.get("hidden_size", 256), num_layers=ckpt.get("num_layers", 5)).to(device)
+    model = MLP(
+        N_i, N_o,
+        hidden_size=ckpt.get("hidden_size", 256),
+        num_layers=ckpt.get("num_layers", 5),
+        activation=ckpt.get("activation", getattr(cfg, "activation", "relu")),
+    ).to(device)
     load_checkpoint(model, model_path)
     model.eval()
 
@@ -339,3 +349,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

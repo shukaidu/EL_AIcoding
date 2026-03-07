@@ -4,7 +4,7 @@ from scipy.sparse.linalg import spsolve
 
 
 def gen_dist_1d(N: int, alpha: float):
-    """Random smooth 1D field with Fourier decay ~ 1/(1+|k|^alpha). Returns (f, x)."""
+    """Random smooth 1D field with Fourier decay ~ 1/(1+|k|^alpha). Returns real 1D array (N,)."""
     k = np.arange(-N // 2, N // 2)
     decay = 1.0 + np.abs(k) ** alpha
     Y = (np.random.randn(N) + 1j * np.random.randn(N)) / decay
@@ -115,3 +115,4 @@ if __name__ == "__main__":
     xc, u0, u = run_reference_solver()
     print(f"nx = {cfg.nx}, nt = {cfg.nt}")
     print(f"u0 mean = {u0.mean():.6f}, u mean = {u.mean():.6f}")
+
