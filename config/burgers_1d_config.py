@@ -34,7 +34,7 @@ seed_base = 42
 b_size = 128
 num_epochs = 2500
 hidden_size = 128
-num_hidden_layers = 6
+num_layers = 6
 lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 
 # ---------------------------------------------------------------------------

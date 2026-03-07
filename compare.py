@@ -13,6 +13,14 @@ import matplotlib.pyplot as plt
 _repo_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _repo_root)
 
+from common.train_loop import get_device
+
+
+def _speedup_str(time_ref, time_nn):
+    if time_nn > 0 and time_ref >= 0:
+        return f"{time_ref / time_nn:.1f}×"
+    return "N/A (t=0)"
+
 
 def _compare_burgers_1d(data_dir, out_dir):
     from pde.burgers_1d import gen_dist, build_diffusion_matrix, integrate_burger
@@ -51,15 +59,14 @@ def _compare_burgers_1d(data_dir, out_dir):
 
     dt_nn = njp * dt
     n_nn_steps = int(round(cfg.compare_t_end / dt_nn))
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     model_path = os.path.join(data_dir, cfg.model_pth)
     if not os.path.isfile(model_path):
         print(f"Model not found: {model_path}. Run: python -m ml.train --problem burgers_1d")
         return
     ckpt = torch.load(model_path, map_location="cpu")
-    hidden_size = ckpt.get("hidden_size", 256)
     N_i, N_o = 2 * nst + nwd, nwd
-    model = MLP(N_i, N_o, hidden_size=hidden_size, num_layers=ckpt.get("num_hidden_layers", 6), activation="relu").to(device)
+    model = MLP(N_i, N_o, hidden_size=ckpt.get("hidden_size", 256), num_layers=ckpt.get("num_layers", 6), activation="relu").to(device)
     load_checkpoint(model, None, model_path)
     model.eval()
 
@@ -98,7 +105,7 @@ def _compare_burgers_1d(data_dir, out_dir):
             continue
         time_fv = fv_time_list[i]
         time_nn = nn_time_list[nn_idx]
-        speedup = time_fv / time_nn if time_nn > 0 else float("inf")
+        speedup_str = _speedup_str(time_fv, time_nn)
         fig, ax = plt.subplots(figsize=(7, 4))
         ax.plot(xc, u_fv_t, label="FV", linewidth=1.5)
         ax.plot(xc, u_nn_t, label="NN", linewidth=1.5, alpha=0.8)
@@ -107,7 +114,7 @@ def _compare_burgers_1d(data_dir, out_dir):
         ax.set_title(f"t = {times[i]:.2f}")
         ax.legend()
         ax.set_ylim(y_lim)
-        ax.text(0.02, 0.98, f"FV runtime: {time_fv:.3f} s\nNN runtime: {time_nn:.4f} s\nNN speedup: {speedup:.1f}×",
+        ax.text(0.02, 0.98, f"FV runtime: {time_fv:.3f} s\nNN runtime: {time_nn:.4f} s\nNN speedup: {speedup_str}",
                 transform=ax.transAxes, fontsize=9, verticalalignment="top",
                 bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
         plt.tight_layout()
@@ -122,7 +129,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     from common.models import MLP
     from ml.snapshot import load_checkpoint
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     model_path = os.path.join(data_dir, cfg.model_pth)
     if not os.path.isfile(model_path):
         print(f"Model not found: {model_path}. Run: python -m ml.train --problem wave_2d_linear")
@@ -210,8 +217,8 @@ def _compare_wave_2d_linear(data_dir, out_dir):
             fig.colorbar(pc0, ax=[axes[0, c], axes[1, c]], label=comp_names[c])
         time_spec = spectral_time_per_frame[k]
         time_nn = nn_time_list[i]
-        speedup = time_spec / time_nn if time_nn > 0 else float("inf")
-        fig.text(0.02, 0.98, f"Spectral: {time_spec:.3f} s\nNN: {time_nn:.4f} s\nSpeedup: {speedup:.1f}×",
+        speedup_str = _speedup_str(time_spec, time_nn)
+        fig.text(0.02, 0.98, f"Spectral: {time_spec:.3f} s\nNN: {time_nn:.4f} s\nSpeedup: {speedup_str}",
                  fontsize=9, verticalalignment="top", bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
         plt.suptitle(f"t = {t_hist[k]:.3f} (frame {k})")
         plt.savefig(os.path.join(out_dir, f"t{i}.png"), dpi=120)
@@ -226,7 +233,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
     from ml.snapshot import load_checkpoint
 
     nwd = cfg.nwd
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     model_path = os.path.join(data_dir, cfg.model_pth)
     if not os.path.isfile(model_path):
         print(f"Model not found: {model_path}. Run: python -m ml.train --problem wave_2d_nonlinear")
@@ -311,8 +318,8 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
             fig.colorbar(pc0, ax=[axes[0, c], axes[1, c]], label=comp_names[c])
         time_spec = spectral_time_per_frame[k]
         time_nn = nn_time_list[i]
-        speedup = time_spec / time_nn if time_nn > 0 else float("inf")
-        fig.text(0.02, 0.98, f"Spectral: {time_spec:.3f} s\nNN: {time_nn:.4f} s\nSpeedup: {speedup:.1f}×",
+        speedup_str = _speedup_str(time_spec, time_nn)
+        fig.text(0.02, 0.98, f"Spectral: {time_spec:.3f} s\nNN: {time_nn:.4f} s\nSpeedup: {speedup_str}",
                  fontsize=9, verticalalignment="top", bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
         plt.suptitle(f"t = {t_hist[k]:.3f} (frame {k})")
         plt.savefig(os.path.join(out_dir, f"t{i}.png"), dpi=120)

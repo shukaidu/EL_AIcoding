@@ -12,15 +12,8 @@ def _loaders(X, Y, device, b_size, test_split=0.2):
             torch.utils.data.DataLoader(te_ds, batch_size=b_size, shuffle=False))
 
 
-def load_burgers_1d(path, device, b_size=100, test_split=0.2):
-    d = scipy.io.loadmat(path)
-    xi = torch.tensor(d["input_tensor"], dtype=torch.float32).t()
-    xo = torch.tensor(d["output_tensor"], dtype=torch.float32).t()
-    tl, vl = _loaders(xi.numpy(), xo.numpy(), device, b_size, test_split)
-    return tl, vl, xi.size(1), xo.size(1), xi.size(0)
-
-
-def load_wave_2d_linear(path, device, b_size=100, test_split=0.2):
+def load_mat(path, device, b_size=100, test_split=0.2):
+    """Load flat (features x samples) .mat — used by burgers_1d and wave_2d_linear."""
     d = scipy.io.loadmat(path)
     xi = torch.tensor(d["input_tensor"], dtype=torch.float32).t()
     xo = torch.tensor(d["output_tensor"], dtype=torch.float32).t()

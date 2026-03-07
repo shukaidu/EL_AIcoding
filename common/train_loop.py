@@ -1,4 +1,4 @@
-"""Device selection and training curve plot."""
+"""Shared utilities: device selection and training curve plot."""
 import os
 import torch
 import matplotlib

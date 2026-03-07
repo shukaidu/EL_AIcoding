@@ -1,4 +1,5 @@
 """Train: python -m ml.train --problem burgers_1d|wave_2d_linear|wave_2d_nonlinear"""
+import importlib
 import os
 import sys
 import argparse
@@ -9,7 +10,7 @@ _ml_dir = os.path.dirname(os.path.abspath(__file__))
 _repo_root = os.path.dirname(_ml_dir)
 sys.path.insert(0, _repo_root)
 
-from common.data_io import load_burgers_1d, load_wave_2d_linear, load_wave_2d_nonlinear
+from common.data_io import load_mat, load_wave_2d_nonlinear
 from common.models import MLP, ShrinkCNN
 from common.train_loop import get_device, plot_training_history
 from ml.snapshot import save_checkpoint
@@ -71,25 +72,20 @@ def main():
     device = get_device()
     print(f"Training on: {device}")
 
-    if problem == "burgers_1d":
-        import config.burgers_1d_config as cfg
+    # burgers_1d and wave_2d_linear both use MLP + flat .mat loader
+    _MLP_PROBLEMS = {
+        "burgers_1d": ("config.burgers_1d_config", "relu"),
+        "wave_2d_linear": ("config.wave_2d_linear_config", "identity"),
+    }
+    if problem in _MLP_PROBLEMS:
+        cfg_module, activation = _MLP_PROBLEMS[problem]
+        cfg = importlib.import_module(cfg_module)
         path = os.path.join(data_dir, cfg.data_mat)
         if not os.path.isfile(path):
-            print(f"Data not found: {path}. Run: python gen_data.py --problem burgers_1d")
+            print(f"Data not found: {path}. Run: python gen_data.py --problem {problem}")
             return
-        tl, vl, N_i, N_o, _ = load_burgers_1d(path, device, b_size=cfg.b_size, test_split=0.2)
-        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_hidden_layers, activation="relu").to(device)
-        _run(model, tl, vl, cfg, data_dir, device, hidden_size=cfg.hidden_size, num_hidden_layers=cfg.num_hidden_layers)
-        return
-
-    if problem == "wave_2d_linear":
-        import config.wave_2d_linear_config as cfg
-        path = os.path.join(data_dir, cfg.data_mat)
-        if not os.path.isfile(path):
-            print(f"Data not found: {path}. Run: python gen_data.py --problem wave_2d_linear")
-            return
-        tl, vl, N_i, N_o, _ = load_wave_2d_linear(path, device, b_size=cfg.b_size, test_split=0.2)
-        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation="identity").to(device)
+        tl, vl, N_i, N_o, _ = load_mat(path, device, b_size=cfg.b_size)
+        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation=activation).to(device)
         _run(model, tl, vl, cfg, data_dir, device, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers)
         return
 
@@ -99,7 +95,7 @@ def main():
         if not os.path.isfile(path):
             print(f"Data not found: {path}. Run: python gen_data.py --problem wave_2d_nonlinear")
             return
-        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny = load_wave_2d_nonlinear(path, device, b_size=cfg.b_size, test_split=0.2)
+        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny = load_wave_2d_nonlinear(path, device, b_size=cfg.b_size)
         model = ShrinkCNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
         _run(model, tl, vl, cfg, data_dir, device, base=cfg.base)
         return
