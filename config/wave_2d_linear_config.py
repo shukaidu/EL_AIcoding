@@ -3,16 +3,6 @@ import numpy as np
 
 # PDE
 c = 1.0
-ic_param_defaults = {
-    "m_flower": 8,
-    "k0_packet": 8,
-    "theta_pkt": np.pi / 6,
-    "sigma_frac": 0.15,
-    "band_kmin": 10,
-    "band_kmax": 14,
-    "white_smooth": 0.1,
-    "amplitude": 1.0,
-}
 
 # Grid and time (must match between gen_data and compare)
 NX = NY = 256

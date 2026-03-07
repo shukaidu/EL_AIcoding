@@ -9,6 +9,17 @@ Python port of wave2d_main.m.
 """
 import numpy as np
 
+IC_PARAM_DEFAULTS = {
+    "m_flower": 8,
+    "k0_packet": 8,
+    "theta_pkt": np.pi / 6,
+    "sigma_frac": 0.15,
+    "band_kmin": 10,
+    "band_kmax": 14,
+    "white_smooth": 0.1,
+    "amplitude": 1.0,
+}
+
 
 def wrap(z, L):
     """Wrap to [-L/2, L/2)."""
@@ -130,8 +141,7 @@ def wave2d_main(
     u_history shape (NX, NY, n_frames), v_history same.
     """
     if ic_params is None:
-        from config import wave_2d_linear_config
-        ic_params = wave_2d_linear_config.ic_param_defaults.copy()
+        ic_params = IC_PARAM_DEFAULTS.copy()
     ic_params["rng_seed"] = rng_seed
 
     # Grid (periodic, exclude right endpoint)
