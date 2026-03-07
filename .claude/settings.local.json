@@ -1,9 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)",
-      "Bash(/c/Users/dushu/anaconda3/python.exe:*)",
-      "Bash(jobs:*)"
+      "TaskOutput",
+      "Bash(git *)",
+      "Bash(/c/Users/dushu/anaconda3/python.exe *)",
+      "Bash(find * -name *.png -delete)",
+      "Bash(cp *)",
+      "Bash(cp:*)"
     ]
   }
 }

@@ -135,7 +135,7 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
 \end{figure}
 
 \subsection{1D Burgers: FV vs.\ NN}
-Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $4.092$\,s, NN total $0.3364$\,s (speedup $12.16\times$).
+Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $3.909$\,s, NN total $0.3190$\,s (speedup $12.25\times$).
 
 \begin{figure}[H]
   \centering
@@ -155,7 +155,7 @@ Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0},
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $0.786$\,s, NN $0.2028$\,s (speedup $3.88\times$).
+Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $0.811$\,s, NN $0.1033$\,s (speedup $7.85\times$).
 
 \begin{figure}[H]
   \centering
@@ -175,7 +175,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 13 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.014588$ (max frame $0.024208$). Runtimes (this run): Spectral $28.969$\,s, NN $0.8768$\,s (speedup $33.04\times$).
+Comparison at 13 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.013695$ (max frame $0.020154$). Runtimes (this run): Spectral $27.672$\,s, NN $0.7460$\,s (speedup $37.09\times$).
 
 \begin{figure}[H]
   \centering

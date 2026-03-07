@@ -28,9 +28,8 @@
 4. **对比**：`python compare.py --problem <问题名>`
 5. **拷图**：将 `data/<问题名>/training_history.png` 和 `data/<问题名>/compare/*.png` 拷到 `latex/figures/<问题名>/`
 6. **更新 `latex/report.tex`**：参数表、耗时/加速比数值、图引用数量必须与本次实验一致
-7. **编译**：`cd latex && pdflatex report.tex`（运行两次）
 
-**注意**：步骤 6 不可省略，每次跑完 compare 后都要更新 report.tex 再编译。
+**注意**：步骤 6 不可省略，每次跑完 compare 后都要更新 report.tex。**不需要编译 PDF。**
 
 ## 后台任务
 - 用 `/c/Users/dushu/anaconda3/python.exe` 运行 Python（不要用反斜杠路径）
