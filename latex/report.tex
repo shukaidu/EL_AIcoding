@@ -29,7 +29,7 @@ The goal is to learn a \emph{local} map (one time step or a few) on a small spat
 \subsection{Three test cases}
 \begin{itemize}
   \item \textbf{1D Burgers (viscous):} $u_t + u u_x = \nu u_{xx}$ on $[0,L]$ with periodic BC. Reference: finite-volume Godunov flux + implicit diffusion. NN: MLP mapping a 1D patch (input length $2n_{\mathrm{st}}+n_{\mathrm{wd}}$) to interior ($n_{\mathrm{wd}}$ cells) over one step of $n_{\mathrm{jp}}$ time steps.
-  \item \textbf{2D linear wave:} $u_{tt} = c^2(u_{xx}+u_{yy})$ with periodic BC. Reference: Fourier pseudo-spectral, exact modal time step. NN: MLP mapping two channels (displacement and velocity) on a 2D patch to the interior over one frame.
+  \item \textbf{2D linear wave:} $u_{tt} = c^2(u_{xx}+u_{yy})$ with periodic BC. Reference: Fourier pseudo-spectral with RK4 time stepping. NN: MLP mapping two channels (displacement and velocity) on a 2D patch to the interior over one frame.
   \item \textbf{2D nonlinear shallow water:} Rotating shallow water in Fourier space with RK4. State $(h,q_x,q_y)$. Reference: spectral; NN: CNN (patch in, patch out) with optional TV regularization in the loss.
 \end{itemize}
 
@@ -112,7 +112,7 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
 \section{Results}\label{sec:results}
 
 \subsection{Training history}
-Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the three problems. Burgers and 2D linear use MLP; 2D nonlinear uses ShrinkCNN with per-channel weighting and optional TV term.
+Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the three problems. Burgers and 2D linear use MLP; 2D nonlinear uses a residual CNN (3 in/out channels).
 
 \begin{figure}[H]
   \centering
@@ -135,7 +135,7 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
 \end{figure}
 
 \subsection{1D Burgers: FV vs.\ NN}
-Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=10}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $3.909$\,s, NN total $0.3190$\,s (speedup $12.25\times$).
+Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=6}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $3.969$\,s, NN total $0.2939$\,s (speedup $13.50\times$).
 
 \begin{figure}[H]
   \centering
@@ -145,17 +145,17 @@ Comparison at 10 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0},
 \end{figure}
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t5.png}
-  \caption{Burgers: $t=1.0$.}
+  \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t2.png}
+  \caption{Burgers: mid-run frame.}
 \end{figure}
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t9.png}
-  \caption{Burgers: $t=2.0$.}
+  \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t5.png}
+  \caption{Burgers: final frame ($t=2.0$).}
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $0.811$\,s, NN $0.1033$\,s (speedup $7.85\times$).
+Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $3.590$\,s, NN $0.0938$\,s (speedup $38.27\times$).
 
 \begin{figure}[H]
   \centering
@@ -175,7 +175,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 13 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.013695$ (max frame $0.020154$). Runtimes (this run): Spectral $27.672$\,s, NN $0.7460$\,s (speedup $37.09\times$).
+Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.025903$ (max frame $0.040366$). Runtimes (this run): Spectral $28.513$\,s, NN $1.3108$\,s (speedup $21.75\times$).
 
 \begin{figure}[H]
   \centering

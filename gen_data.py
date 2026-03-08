@@ -15,26 +15,24 @@ def _burgers_1d_single_trajectory(args):
     seed, per_traj = args
     import config.burgers_1d_config as cfg
     from pde.burgers_1d import gen_dist_1d, build_diffusion_matrix, integrate_burger
-    np.random.seed(seed)
+
+    rng = np.random.default_rng(seed)
     nx, nt = cfg.nx, cfg.nt
     njp, nst, nwd = cfg.njp, cfg.nst, cfg.nwd
-    u0 = gen_dist_1d(nx, cfg.alpha)
-    u0 = u0 + cfg.u_mean
-    u = u0.copy()
+
+    u0 = gen_dist_1d(nx, cfg.alpha, rng) + cfg.u_mean
     u_history = np.zeros((nx, nt + 1), dtype=float)
-    u_history[:, 0] = u
+    u_history[:, 0] = u0
     A = build_diffusion_matrix(nx, cfg.dt, cfg.dx, cfg.nu)
+    u = u0.copy()
     for n in range(nt):
         u = integrate_burger(u, cfg.dt, cfg.dx, cfg.nu, A=A)
         u_history[:, n + 1] = u
-    n_avail = (nx - 2 * nst - nwd + 1) * max(0, nt - njp + 1)
-    n_take = min(per_traj, n_avail)
+
+    i0_pool = np.random.randint(0, nx - 2 * nst - nwd + 1, size=per_traj)
+    j0_pool = np.random.randint(0, nt - njp + 1, size=per_traj)
     inputs_list, outputs_list = [], []
-    if n_take <= 0:
-        return inputs_list, outputs_list
-    i0_pool = np.random.randint(0, nx - 2 * nst - nwd + 1, size=n_take)
-    j0_pool = np.random.randint(0, nt - njp + 1, size=n_take)
-    for k in range(n_take):
+    for k in range(per_traj):
         i0, j0 = i0_pool[k], j0_pool[k]
         inputs_list.append(u_history[i0 : i0 + 2 * nst + nwd, j0])
         outputs_list.append(u_history[i0 + nst : i0 + nst + nwd, j0 + njp])
@@ -46,8 +44,7 @@ def run_burgers_1d(data_dir):
 
     rng = np.random.RandomState(cfg.seed_base)
     seeds = [rng.randint(0, 2**31) for _ in range(cfg.n_trajectories)]
-    per_traj = (cfg.nsamp + cfg.n_trajectories - 1) // cfg.n_trajectories
-    run_configs = [(seed, per_traj) for seed in seeds]
+    run_configs = [(seed, cfg.nsamp // cfg.n_trajectories) for seed in seeds]
     n_workers = min(cfg.n_trajectories, max(1, cpu_count() - 1))
     if n_workers <= 1:
         results = [_burgers_1d_single_trajectory(c) for c in run_configs]
@@ -110,8 +107,7 @@ def run_wave_2d_linear(data_dir):
             j0 = rng.integers(0, cfg.NY - cfg.patch_side + 1)
             t0 = rng.integers(0, max(1, n_frames - cfg.njp))
             t1 = t0 + cfg.njp
-            if t1 >= n_frames:
-                continue
+
             input_arr_u[:, :, cnt] = u_hist[i0 : i0 + cfg.patch_side, j0 : j0 + cfg.patch_side, t0]
             input_arr_v[:, :, cnt] = v_hist[i0 : i0 + cfg.patch_side, j0 : j0 + cfg.patch_side, t0]
             output_arr_u[:, :, cnt] = u_hist[i0 + cfg.nst : i0 + cfg.nst + cfg.nwd, j0 + cfg.nst : j0 + cfg.nst + cfg.nwd, t1]
@@ -132,12 +128,12 @@ def run_wave_2d_linear(data_dir):
 
 
 def _wave2d_nonlinear_single_run(args):
-    """Top-level for multiprocessing pickle on Windows. args = (seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, frot0, nu_h, nu_q)."""
-    seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, frot0, nu_h, nu_q = args
+    """Top-level for multiprocessing pickle on Windows. args = (seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, f_coriolis, nu_h, nu_q). Returns (t_hist, U_hist)."""
+    seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, f_coriolis, nu_h, nu_q = args
     from pde.wave_2d_nonlinear import wave2d_spectral
     t_hist, U_hist, _, _, _, _, _, _ = wave2d_spectral(
         Lx, Ly, nx, ny, TF, TSCREEN,
-        g=g, h0=h0, frot0=frot0, nu_h=nu_h, nu_q=nu_q,
+        g=g, h0=h0, f_coriolis=f_coriolis, nu_h=nu_h, nu_q=nu_q,
         initial_condition=ic, rng_seed=seed,
     )
     return t_hist, U_hist
@@ -148,7 +144,7 @@ def run_wave_2d_nonlinear(data_dir):
 
     run_configs = [
         (i + 1, cfg.ic_list[i % len(cfg.ic_list)], cfg.TF, cfg.TSCREEN, cfg.nx, cfg.ny, cfg.Lx, cfg.Ly,
-         cfg.g, cfg.h0, cfg.frot0, cfg.nu_h, cfg.nu_q)
+         cfg.g, cfg.h0, cfg.f_coriolis, cfg.nu_h, cfg.nu_q)
         for i in range(cfg.ntest)
     ]
     n_workers = min(cfg.ntest, max(1, cpu_count() - 1))
@@ -171,16 +167,16 @@ def run_wave_2d_nonlinear(data_dir):
     rng = np.random.default_rng(42)
     input_tensor = np.zeros((cfg.nsamp, 3, patch_side, patch_side), dtype=np.float32)
     output_tensor = np.zeros((cfg.nsamp, 3, cfg.nwd, cfg.nwd), dtype=np.float32)
-    n_per_run = (cfg.nsamp + cfg.ntest - 1) // cfg.ntest
+    n_per_run = cfg.nsamp // cfg.ntest
     cnt = 0
     for ii in range(cfg.ntest):
         U = U_historys[:, :, :, :, ii]
         for _ in range(n_per_run):
             if cnt >= cfg.nsamp:
                 break
-            t0 = rng.integers(0, nt - cfg.njp) if nt > cfg.njp else 0
-            i0 = rng.integers(0, nx_ - 2 * nst - cfg.nwd + 1) if nx_ > 2 * nst + cfg.nwd else 0
-            j0 = rng.integers(0, ny_ - 2 * nst - cfg.nwd + 1) if ny_ > 2 * nst + cfg.nwd else 0
+            t0 = rng.integers(0, nt - cfg.njp)
+            i0 = rng.integers(0, nx_ - 2 * nst - cfg.nwd + 1)
+            j0 = rng.integers(0, ny_ - 2 * nst - cfg.nwd + 1)
             in_patch = U[i0 : i0 + 2 * nst + cfg.nwd, j0 : j0 + 2 * nst + cfg.nwd, :, t0]
             out_patch = U[i0 + nst : i0 + nst + cfg.nwd, j0 + nst : j0 + nst + cfg.nwd, :, t0 + cfg.njp]
             input_tensor[cnt] = np.transpose(in_patch, (2, 0, 1))

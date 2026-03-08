@@ -35,7 +35,7 @@ b_size = 128
 num_epochs = 2500
 hidden_size = 128
 num_layers = 6
-activation = "linear"  # relu|tanh|gelu|linear
+activation = "relu"  # relu|tanh|gelu|linear
 lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 
 # ---------------------------------------------------------------------------
@@ -43,7 +43,7 @@ lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 # ---------------------------------------------------------------------------
 compare_seed = 42
 compare_t_end = 2.0
-compare_n_times = 10
+compare_n_times = 6
 
 # ---------------------------------------------------------------------------
 # Data file names (under data/burgers_1d/)

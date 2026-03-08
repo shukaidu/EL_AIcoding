@@ -9,14 +9,14 @@ h0 = 1.0
 c = np.sqrt(g * h0)
 dx = Lx / nx
 dy = Ly / ny
-frot0 = 0.0
+f_coriolis = 0.0
 nu_h = 0.0
-nu_q = None  # set in solver when None
 
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
 TF = 10.0
 TSCREEN = 10
 dt_internal = 0.5 * min(dx, dy) / c   # must match pde/wave_2d_nonlinear.py
+nu_q = 1e-3 * (min(dx, dy) ** 2) / dt_internal
 dt_samp = TSCREEN * dt_internal        # time between saved frames
 
 # Prediction window: one NN step = njp frames (1 = lighter/faster; 2 = heavier/slower)
@@ -32,8 +32,8 @@ patch_side = nwd + 2 * nst
 # Data generation
 nsamp = 6000
 ntest = 10
-#ic_list = ["random", "ring"]
-ic_list = ["random"]
+ic_list = ["random", "ring"]
+#ic_list = ["random"]
 
 # Training
 b_size = 128
@@ -45,6 +45,7 @@ lr_schedule = [(40, 3e-4), (70, 1e-4), (80, 1e-5)]
 compare_TF = 1.0
 compare_ic = "random"
 compare_seed = 42
+compare_n_times = 6
 
 # Data file names (under data/wave_2d_nonlinear/)
 data_mat = "data_wave.mat"

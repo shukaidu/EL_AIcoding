@@ -1,13 +1,14 @@
+import time as _time
 import numpy as np
 from scipy.sparse import diags, eye
 from scipy.sparse.linalg import spsolve
 
 
-def gen_dist_1d(N: int, alpha: float):
+def gen_dist_1d(N: int, alpha: float, rng):
     """Random smooth 1D field with Fourier decay ~ 1/(1+|k|^alpha). Returns real 1D array (N,)."""
     k = np.arange(-N // 2, N // 2)
     decay = 1.0 + np.abs(k) ** alpha
-    Y = (np.random.randn(N) + 1j * np.random.randn(N)) / decay
+    Y = (rng.standard_normal(N) + 1j * rng.standard_normal(N)) / decay
     Y = np.fft.ifftshift(Y)
     f = np.real(np.fft.ifft(Y)) * N
     f -= f.mean()
@@ -80,6 +81,15 @@ def integrate_burger(u, dt: float, dx: float, nu: float, A=None):
     return u_next
 
 
+def setup_burger(nx, dx, dt, L, nu, alpha, u_mean, rng_seed):
+    """初始化 1D Burgers 状态。返回 (u0, xc, A)。"""
+    rng = np.random.default_rng(rng_seed)
+    xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
+    u0 = gen_dist_1d(nx, alpha, rng) + u_mean
+    A = build_diffusion_matrix(nx, dt, dx, nu)
+    return u0, xc, A
+
+
 def run_reference_solver():
     """
     Run the full FV solver with parameters from config.burgers_1d_config.
@@ -93,14 +103,22 @@ def run_reference_solver():
     nx, dx, dt, nt = cfg.nx, cfg.dx, cfg.dt, cfg.nt
     alpha, u_mean, nu = cfg.alpha, cfg.u_mean, cfg.nu
 
+    rng = np.random.default_rng(42)
     xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
-    u0 = gen_dist_1d(nx, alpha)
-    u0 = u0 + u_mean
+    u0 = gen_dist_1d(nx, alpha, rng) + u_mean
 
     u = u0.copy()
     A = build_diffusion_matrix(nx, dt, dx, nu)
-    for _ in range(nt):
+    _t0 = _time.perf_counter()
+    print_every = max(1, nt // 20)
+    for n in range(nt):
         u = integrate_burger(u, dt, dx, nu, A=A)
+        if (n + 1) % print_every == 0 or n + 1 == nt:
+            elapsed = _time.perf_counter() - _t0
+            t_phys = (n + 1) * dt
+            eta = elapsed / (n + 1) * (nt - n - 1)
+            print(f"  [burgers_1d] step {n+1:5d}/{nt}  t={t_phys:.4f}  "
+                  f"elapsed={elapsed:.1f}s  ETA={eta:.1f}s  |u|_max={np.max(np.abs(u)):.4f}", flush=True)
 
     return xc, u0, u
 
