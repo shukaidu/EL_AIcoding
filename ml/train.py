@@ -10,9 +10,9 @@ _ml_dir = os.path.dirname(os.path.abspath(__file__))
 _repo_root = os.path.dirname(_ml_dir)
 sys.path.insert(0, _repo_root)
 
-from common.data_io import load_mat, load_wave_2d_nonlinear
-from common.models import MLP, CNN
-from common.train_loop import get_device, plot_training_history
+from ml.data_io import load_mat, load_wave_2d_nonlinear
+from ml.models import MLP, CNN
+from ml.train_loop import get_device, plot_training_history
 from ml.snapshot import save_checkpoint
 
 

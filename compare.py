@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 _repo_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _repo_root)
 
-from common.train_loop import get_device
+from ml.train_loop import get_device
 
 
 def _speedup_str(time_ref, time_nn):
@@ -25,7 +25,7 @@ def _speedup_str(time_ref, time_nn):
 def _compare_burgers_1d(data_dir, out_dir):
     from pde.burgers_1d import integrate_burger, setup_burger
     import config.burgers_1d_config as cfg
-    from common.models import MLP
+    from ml.models import MLP
     from ml.snapshot import load_checkpoint
 
     L = cfg.L
@@ -116,7 +116,7 @@ def _compare_burgers_1d(data_dir, out_dir):
 def _compare_wave_2d_linear(data_dir, out_dir):
     from pde.wave_2d_linear import setup_wave2d, advance_tscreen
     import config.wave_2d_linear_config as cfg
-    from common.models import MLP
+    from ml.models import MLP
     from ml.snapshot import load_checkpoint
 
     device = get_device()
@@ -231,7 +231,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
 def _compare_wave_2d_nonlinear(data_dir, out_dir):
     from pde.wave_2d_nonlinear import setup_wave2d_nonlinear, advance_tscreen
     import config.wave_2d_nonlinear_config as cfg
-    from common.models import CNN
+    from ml.models import CNN
     from ml.snapshot import load_checkpoint
 
     nwd = cfg.nwd
