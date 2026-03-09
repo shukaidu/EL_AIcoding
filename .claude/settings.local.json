@@ -6,7 +6,8 @@
       "Bash(/c/Users/dushu/anaconda3/python.exe *)",
       "Bash(find * -name *.png -delete)",
       "Bash(cp *)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(do:*)"
     ]
   }
 }
