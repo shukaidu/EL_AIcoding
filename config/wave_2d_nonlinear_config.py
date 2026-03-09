@@ -41,6 +41,8 @@ num_epochs = 80   # fewer epochs, better schedule → similar or better error, f
 base = 32        # CNN base channels (keep moderate size)
 lr_schedule = [(40, 3e-4), (70, 1e-4), (80, 1e-5)]
 
+warmup_T = 4.0   # frames before this time are excluded from training
+
 # Compare (reference vs NN rollout)
 compare_TF = 1.0
 compare_ic = "random"

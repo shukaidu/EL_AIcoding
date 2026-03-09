@@ -279,6 +279,11 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
                 U_nn[ii * nwd : (ii + 1) * nwd, jj * nwd : (jj + 1) * nwd, :] = np.transpose(out, (1, 2, 0))
         return U_nn
 
+    # warm up spectral solver to T=warmup_T
+    warmup_steps = int(round(cfg.warmup_T / (cfg.TSCREEN * dt)))
+    for _ in range(warmup_steps):
+        h, qx, qy = advance_tscreen(h, qx, qy, rhs, dt, cfg.TSCREEN)
+
     initial_frame = np.stack([h - cfg.h0, qx, qy], axis=-1)
     U_nn = initial_frame.copy()
     spec_frames = [initial_frame]

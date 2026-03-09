@@ -100,6 +100,8 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     $g$, $h_0$ & 9.8, 1.0 \\
     $T_{\mathrm{screen}}$ & 10 \\
     $n_{\mathrm{wd}}$ & 32 \\
+    Warmup $T_{\mathrm{warmup}}$ & 4.0 (early frames excluded) \\
+    Compare $T_F$ & 1.0 \\
     Compare IC & random \\
     \midrule
     Training samples & 6000 \\
@@ -175,7 +177,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.028712$ (max frame $0.049520$). Runtimes (this run): Spectral $29.917$\,s, NN $1.5156$\,s (speedup $19.74\times$).
+Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.014129$ (max frame $0.026497$). Runtimes (this run): Spectral $27.776$\,s, NN $1.2531$\,s (speedup $22.2\times$).
 
 \begin{figure}[H]
   \centering

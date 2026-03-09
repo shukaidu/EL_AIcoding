@@ -174,7 +174,8 @@ def run_wave_2d_nonlinear(data_dir):
         for _ in range(n_per_run):
             if cnt >= cfg.nsamp:
                 break
-            t0 = rng.integers(0, nt - cfg.njp)
+            t_warmup = int(round(cfg.warmup_T / cfg.dt_samp))
+            t0 = rng.integers(t_warmup, nt - cfg.njp)
             i0 = rng.integers(0, nx_ - 2 * nst - cfg.nwd + 1)
             j0 = rng.integers(0, ny_ - 2 * nst - cfg.nwd + 1)
             in_patch = U[i0 : i0 + 2 * nst + cfg.nwd, j0 : j0 + 2 * nst + cfg.nwd, :, t0]
