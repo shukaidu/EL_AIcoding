@@ -22,6 +22,10 @@ def _speedup_str(time_ref, time_nn):
     return "N/A (t=0)"
 
 
+def _boundary_ext_2d_periodic(u, nst):
+    u_ext = np.hstack([u[:, -nst:], u, u[:, :nst]])
+    return np.vstack([u_ext[-nst:], u_ext, u_ext[:nst]])
+
 def _compare_burgers_1d(data_dir, out_dir):
     from pde.burgers_1d import integrate_burger, setup_burger
     import config.burgers_1d_config as cfg
@@ -144,14 +148,10 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     steps_per_nn = cfg.TSCREEN * cfg.njp
     n_nn_steps = int(round(cfg.compare_TF / (steps_per_nn * cfg.dt)))
 
-    def boundary_ext(u, nst):
-        u_ext = np.hstack([u[:, -nst:], u, u[:, :nst]])
-        return np.vstack([u_ext[-nst:], u_ext, u_ext[:nst]])
-
     def one_nn_step(u2d, v2d, model, nwd, nst, patch_side, device):
         NX, NY = u2d.shape
-        u_ext = boundary_ext(u2d, nst)
-        v_ext = boundary_ext(v2d, nst)
+        u_ext = _boundary_ext_2d_periodic(u2d, nst)
+        v_ext = _boundary_ext_2d_periodic(v2d, nst)
         u_nn = np.zeros_like(u2d)
         v_nn = np.zeros_like(v2d)
         for ii in range(NX // nwd):
@@ -257,16 +257,12 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
     steps_per_nn = cfg.TSCREEN * cfg.njp
     n_nn_steps = int(round(cfg.compare_TF / (steps_per_nn * dt)))
 
-    def boundary_ext(u, nst):
-        u_ext = np.hstack([u[:, -nst:], u, u[:, :nst]])
-        return np.vstack([u_ext[-nst:], u_ext, u_ext[:nst]])
-
     def integrate_nn_cnn(model, U0, nwd, nst, patch_side, device):
         nx, ny, _ = U0.shape
         U_nn = np.zeros_like(U0)
-        u1 = boundary_ext(U0[:, :, 0], nst)
-        u2 = boundary_ext(U0[:, :, 1], nst)
-        u3 = boundary_ext(U0[:, :, 2], nst)
+        u1 = _boundary_ext_2d_periodic(U0[:, :, 0], nst)
+        u2 = _boundary_ext_2d_periodic(U0[:, :, 1], nst)
+        u3 = _boundary_ext_2d_periodic(U0[:, :, 2], nst)
         for ii in range(nx // nwd):
             for jj in range(ny // nwd):
                 ind1 = slice(ii * nwd, ii * nwd + patch_side)

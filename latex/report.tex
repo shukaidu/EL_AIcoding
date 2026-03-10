@@ -137,7 +137,7 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
 \end{figure}
 
 \subsection{1D Burgers: FV vs.\ NN}
-Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=6}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $3.969$\,s, NN total $0.2939$\,s (speedup $13.50\times$).
+Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=6}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $4.266$\,s, NN total $0.3771$\,s (speedup $11.31\times$).
 
 \begin{figure}[H]
   \centering
@@ -157,7 +157,7 @@ Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, 
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $3.590$\,s, NN $0.0938$\,s (speedup $38.27\times$).
+Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $3.828$\,s, NN $0.1292$\,s (speedup $29.63\times$).
 
 \begin{figure}[H]
   \centering
@@ -177,7 +177,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.014129$ (max frame $0.026497$). Runtimes (this run): Spectral $27.776$\,s, NN $1.2531$\,s (speedup $22.2\times$).
+Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.016179$ (max frame $0.033673$). Runtimes (this run): Spectral $29.362$\,s, NN $1.5274$\,s (speedup $19.22\times$).
 
 \begin{figure}[H]
   \centering
@@ -199,5 +199,3 @@ Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{comp
 \section{Conclusion}\label{sec:conclusion}
 The pipelines for 1D Burgers, 2D linear wave, and 2D nonlinear shallow water run successfully with a unified workflow: \texttt{gen\_data.py}, \texttt{ml.train}, and \texttt{compare.py} are invoked with \texttt{--problem} to select the case. All configuration is in \texttt{config/}; PDE modules take parameters from config and contain no duplicate defaults. The reported figures show that the NN surrogates track the reference solutions and achieve noticeable speedups in the comparison runs.
 \end{document}
-
-
