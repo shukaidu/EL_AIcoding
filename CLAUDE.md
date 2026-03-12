@@ -12,8 +12,12 @@
 
 - `config/` — 所有可调参数（改实验设置只改这里）
 - `pde/` — PDE 求解器
-- `common/` — 公共工具（数据加载、模型、训练循环）
-- `ml/train.py` — 训练入口
+- `ml/` — 机器学习模块
+  - `train.py` — 训练入口（`python -m ml.train --problem <问题名>`）
+  - `train_loop.py` — 训练循环
+  - `data_io.py` — 数据加载
+  - `snapshot.py` — 模型快照保存/加载
+  - `models/` — 模型定义（`cnn.py`、`mlp.py`）
 - `gen_data.py` — 数据生成入口
 - `compare.py` — 对比入口
 - `data/<问题名>/` — 数据、模型、对比图输出
