@@ -13,7 +13,6 @@ env/
 # Generated outputs (regenerate with pipeline)
 data/*/training_history.png
 data/*/compare/
-latex/figures/
 
 # IDE / OS
 .idea/
