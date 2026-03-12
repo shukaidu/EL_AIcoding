@@ -4,7 +4,7 @@
 - 始终用**中文**回复。
 
 ## 环境
-- Python 路径：`/c/Users/dushu/anaconda3/python.exe`（bash 中使用正斜杠格式）
+- Python：直接用 `python`（conda base 环境已激活）
 - 工作目录：仓库根目录（含 `gen_data.py`、`compare.py`、`config/`、`pde/`）
 
 ## 项目结构
@@ -32,6 +32,6 @@
 **注意**：步骤 6 不可省略，每次跑完 compare 后都要更新 report.tex。**不需要编译 PDF。**
 
 ## 后台任务
-- 用 `/c/Users/dushu/anaconda3/python.exe` 运行 Python（不要用反斜杠路径）
+- 用 `python` 运行 Python
 - 数据生成三个问题可并行后台运行；训练建议顺序执行（避免 GPU 争抢）
 - 用 `TaskOutput` 等待后台任务，超时设为 600000ms
