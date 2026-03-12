@@ -1,8 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "TaskOutput",
-      "Bash(git *)",
+"Bash(git *)",
       "Bash(python *)",
       "Bash(find * -name *.png -delete)",
       "Bash(cp *)"
