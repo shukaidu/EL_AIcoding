@@ -3,13 +3,9 @@
     "allow": [
       "TaskOutput",
       "Bash(git *)",
-      "Bash(/c/Users/dushu/anaconda3/python.exe *)",
+      "Bash(python *)",
       "Bash(find * -name *.png -delete)",
-      "Bash(cp *)",
-      "Bash(cp:*)",
-      "Bash(do:*)",
-      "Bash(python compare.py --problem wave_2d_linear 2>&1)",
-      "Bash(python compare.py --problem wave_2d_nonlinear 2>&1)"
+      "Bash(cp *)"
     ]
   }
 }
