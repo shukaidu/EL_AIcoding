@@ -101,12 +101,14 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     $T_{\mathrm{screen}}$ & 10 \\
     $n_{\mathrm{wd}}$ & 32 \\
     Warmup $T_{\mathrm{warmup}}$ & 4.0 (early frames excluded) \\
-    Compare $T_F$ & 1.0 \\
+    Compare $T_F$ & 2.0 \\
+    Compare frames & 8 \\
     Compare IC & random \\
     \midrule
     Training samples & 6000 \\
-    Epochs & 80 \\
-    CNN base channels & 32 \\
+    Epochs & 150 \\
+    CNN base channels & 48 \\
+    TV smooth weight & 0.05 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -177,7 +179,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN. L1 error (mean over frames) $0.016179$ (max frame $0.033673$). Runtimes (this run): Spectral $29.362$\,s, NN $1.5274$\,s (speedup $19.22\times$).
+Comparison at 8 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=2.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN with TV regularization ($\lambda=0.05$, base=48, 150 epochs). Best configuration from parameter sweep over \texttt{smooth\_weight}\,$\in\{0,0.01,0.05,0.1\}$ and \texttt{base}\,$\in\{32,48\}$. L1 error (mean over frames) $0.014217$ (max frame $0.025887$). Runtimes (this run): Spectral $71.076$\,s, NN $4.240$\,s (speedup $16.8\times$).
 
 \begin{figure}[H]
   \centering
@@ -188,12 +190,12 @@ Comparison at 6 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{comp
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t3.png}
-  \caption{2D nonlinear: mid-run frame.}
+  \caption{2D nonlinear: mid-run frame ($t\approx 1.0$\,s).}
 \end{figure}
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t5.png}
-  \caption{2D nonlinear: final frame.}
+  \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t7.png}
+  \caption{2D nonlinear: final frame ($t=2.0$\,s).}
 \end{figure}
 
 \section{Conclusion}\label{sec:conclusion}

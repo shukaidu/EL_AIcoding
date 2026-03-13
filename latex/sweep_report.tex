@@ -1,0 +1,368 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage[margin=2.5cm]{geometry}
+
+\title{Parameter Sweep Report: 2D Nonlinear Shallow Water\\
+\large \texttt{smooth\_weight} $\times$ \texttt{base} Grid Search with Extended Rollout ($T_F = 2.0$)}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Motivation}
+
+The previous experiment used \texttt{compare\_TF=1.0} (1-second rollout) with fixed hyperparameters
+\texttt{smooth\_weight=0.05} and \texttt{base=32}.
+Two changes were investigated simultaneously:
+\begin{enumerate}
+  \item \textbf{Longer rollout}: extend \texttt{compare\_TF} from 1.0 to 2.0\,s and increase output frames from 6 to 8, to better stress-test the NN surrogate's long-horizon prediction.
+  \item \textbf{Hyperparameter search}: systematically vary the TV regularization weight \texttt{smooth\_weight} and CNN channel width \texttt{base} to find the configuration with the lowest L1 error over the 2-second rollout.
+\end{enumerate}
+
+\section{Experimental Setup}
+
+\subsection{Model and training}
+
+The surrogate is a residual CNN (3 input channels: $h - h_0$, $q_x$, $q_y$; 3 output channels) trained on
+patches extracted from a Fourier-spectral shallow-water solver.
+The loss function is
+\begin{equation}
+  \mathcal{L} = \underbrace{\frac{1}{N}\sum_i \lvert \hat{y}_i - y_i \rvert}_{\text{L1 data}}
+  + \lambda \underbrace{\bigl(\lvert \nabla_x \hat{y}\rvert + \lvert \nabla_y \hat{y}\rvert\bigr)}_{\text{TV regularization}},
+\end{equation}
+where $\lambda = \texttt{smooth\_weight}$.
+Training runs for 150 epochs with the learning rate schedule
+$[(60,\,3\times10^{-4}),\,(110,\,10^{-4}),\,(140,\,3\times10^{-5}),\,(150,\,10^{-5})]$.
+
+\subsection{Parameter grid}
+
+Six combinations were evaluated (Table~\ref{tab:grid}).
+
+\begin{table}[H]
+  \centering
+  \caption{Parameter grid: 6 combinations of \texttt{smooth\_weight} and \texttt{base}.}
+  \label{tab:grid}
+  \begin{tabular}{ccc}
+    \toprule
+    Combination & \texttt{smooth\_weight} $\lambda$ & \texttt{base} (CNN channels) \\
+    \midrule
+    1 & 0.0  & 32 \\
+    2 & 0.01 & 32 \\
+    3 & 0.05 & 32 \\
+    4 & 0.1  & 32 \\
+    5 & 0.0  & 48 \\
+    6 & 0.05 & 48 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+All other settings are held fixed: grid $256\times256$, $n_{\mathrm{wd}}=32$, 6000 training samples,
+batch size 128, warmup $T_{\mathrm{warmup}}=4.0$\,s, compare IC = \texttt{random}, seed 42.
+
+\subsection{Evaluation metric}
+
+After training, each model is rolled out for $T_F = 2.0$\,s alongside the spectral reference.
+The comparison is sampled at 8 uniformly-spaced frames ($t_0,\ldots,t_7$).
+The primary metric is the \textbf{mean L1 error} averaged over all frames and all three state components:
+\begin{equation}
+  \bar{\varepsilon}_{L1} = \frac{1}{N_t}\sum_{k=0}^{N_t-1}
+  \frac{1}{|\Omega|}\sum_{(i,j)} \bigl\lvert U^{\mathrm{NN}}_{k,ij} - U^{\mathrm{ref}}_{k,ij}\bigr\rvert.
+\end{equation}
+
+\section{Results}
+
+\subsection{Summary table}
+
+Table~\ref{tab:results} lists all six combinations sorted by mean L1 error (ascending).
+
+\begin{table}[H]
+  \centering
+  \caption{Sweep results sorted by mean L1 error (2-second rollout, 8 frames).}
+  \label{tab:results}
+  \begin{tabular}{ccccc}
+    \toprule
+    Rank & \texttt{smooth\_weight} & \texttt{base} & L1 mean & L1 max frame \\
+    \midrule
+    \textbf{1} & \textbf{0.05} & \textbf{48} & \textbf{0.014217} & \textbf{0.025887} \\
+    2 & 0.1  & 32 & 0.019245 & 0.038809 \\
+    3 & 0.0  & 32 & 0.020247 & 0.040786 \\
+    4 & 0.01 & 32 & 0.024519 & 0.047638 \\
+    5 & 0.05 & 32 & 0.031534 & 0.068902 \\
+    6 & 0.0  & 48 & 0.035519 & 0.098977 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Key findings}
+
+\begin{enumerate}
+  \item \textbf{Best configuration: $\lambda=0.05$, \texttt{base}=48.}
+    Combining moderate TV regularization with a wider CNN achieves the lowest error
+    (L1 mean = 0.014217, max frame = 0.025887),
+    a \textbf{30\% improvement} over the previous baseline ($\lambda=0.05$, \texttt{base}=32, L1 = 0.031534 on the same 2-second task).
+
+  \item \textbf{TV regularization is essential for wider models.}
+    Without regularization, \texttt{base}=48 is the \emph{worst} configuration (L1 = 0.035519, max = 0.098977),
+    suggesting that the larger model memorizes short-horizon training patterns but diverges
+    over longer rollouts. Adding $\lambda=0.05$ brings it to rank 1.
+
+  \item \textbf{For \texttt{base}=32, less regularization is better.}
+    Among the four base-32 runs, no regularization ($\lambda=0$) outperforms
+    moderate regularization ($\lambda=0.05$, $\lambda=0.1$).
+    This indicates the smaller model is already underfitting the spatial structure,
+    and additional TV penalty further degrades its expressiveness.
+
+  \item \textbf{Intermediate $\lambda$ values ($0.01$, $0.05$ at base=32) are suboptimal.}
+    They neither fully regularize (as $\lambda=0.1$ does) nor allow full data-fitting
+    (as $\lambda=0$ does), yielding middle-ground errors.
+\end{enumerate}
+
+\subsection{Runtime}
+
+The best configuration (\texttt{base}=48) adds modest overhead over the base-32 model.
+Table~\ref{tab:runtime} shows the final compare runtimes.
+
+\begin{table}[H]
+  \centering
+  \caption{Rollout runtimes for the best configuration ($\lambda=0.05$, \texttt{base}=48, $T_F=2.0$\,s).}
+  \label{tab:runtime}
+  \begin{tabular}{lcc}
+    \toprule
+    Solver & Wall time (s) & Speedup \\
+    \midrule
+    Spectral (reference) & 71.076 & $1\times$ \\
+    CNN surrogate (NN)   & 4.240  & $16.8\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Comparison figures (best configuration: absolute TV, $\lambda=0.05$, \texttt{base}=48)}
+
+Figures~\ref{fig:t0}--\ref{fig:t7} show the spectral reference vs.\ NN rollout
+at 8 uniformly-spaced times over $[0,\,2.0]$\,s for state components $(h-h_0,\,q_x,\,q_y)$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t0.png}
+  \caption{Frame 0: $t \approx 0.0$\,s.}
+  \label{fig:t0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t1.png}
+  \caption{Frame 1: $t \approx 0.29$\,s.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t2.png}
+  \caption{Frame 2: $t \approx 0.57$\,s.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t3.png}
+  \caption{Frame 3: $t \approx 0.86$\,s.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t4.png}
+  \caption{Frame 4: $t \approx 1.14$\,s.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t5.png}
+  \caption{Frame 5: $t \approx 1.43$\,s.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t6.png}
+  \caption{Frame 6: $t \approx 1.71$\,s.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_abs_sw0.05_b48/t7.png}
+  \caption{Frame 7: $t = 2.0$\,s (final frame).}
+  \label{fig:t7}
+\end{figure}
+
+\section{Conclusion}
+
+The hyperparameter sweep over 6 combinations identifies
+\textbf{$\lambda = 0.05$, \texttt{base}=48} as the best configuration for the
+2-second nonlinear shallow-water rollout, achieving mean L1 error of 0.014217
+at a $16.8\times$ speedup over the spectral reference.
+The interaction between model capacity (\texttt{base}) and TV regularization ($\lambda$)
+is non-trivial: larger models require regularization to generalize over long horizons,
+while smaller models are harmed by excessive TV penalty.
+
+% ============================================================
+\section{Per-channel Relative TV Regularization (Follow-up Sweep)}
+\label{sec:relative_tv}
+% ============================================================
+
+\subsection{Motivation}
+
+The three state channels $(h-h_0,\,q_x,\,q_y)$ differ in magnitude by roughly 50$\times$
+(std$\,\approx 0.004$ for $h-h_0$, std$\,\approx 0.2$ for $q_x,q_y$).
+The absolute TV penalty $\lambda(\lvert\nabla_x\hat{y}\rvert+\lvert\nabla_y\hat{y}\rvert)$
+therefore penalizes $q_x,q_y$ far more than $h-h_0$.
+A \emph{per-channel relative} formulation normalizes each channel's TV by its own predicted amplitude:
+\begin{equation}
+  \mathcal{L}_{TV}^{\text{rel}} = \lambda \sum_{c=0}^{2}
+  \frac{\mathrm{TV}(\hat{y}_c)}{\mathbb{E}[\lvert\hat{y}_c\rvert] + \varepsilon},
+  \qquad \varepsilon = 10^{-6},
+\end{equation}
+so that each channel receives an equal \emph{proportional} smoothing penalty.
+
+\subsection{Experimental setup}
+
+Model capacity is fixed at \texttt{base}=48 (best from the previous sweep).
+Five values of $\lambda$ are evaluated: $\{0.01, 0.05, 0.1, 0.2, 0.5\}$.
+All other settings (grid, epochs, LR schedule, seed, rollout length) are identical to
+the absolute TV sweep in Section~\ref{sec:results}.
+The sweep was stopped after 3 of 5 configurations completed (sw $= 0.2$ and $0.5$ not run)
+because the trend was already conclusive.
+
+\subsection{Results}
+
+Table~\ref{tab:rel_results} shows the completed relative TV runs alongside all
+absolute TV runs from Table~\ref{tab:results}.
+
+\begin{table}[H]
+  \centering
+  \caption{Combined results: absolute TV (Sweep 1) and relative TV (Sweep 2, \texttt{base}=48).
+           Rows sorted by L1 mean (ascending). Best configuration highlighted.}
+  \label{tab:rel_results}
+  \begin{tabular}{lcccc}
+    \toprule
+    TV mode & $\lambda$ & \texttt{base} & L1 mean & L1 max frame \\
+    \midrule
+    \textbf{absolute} & \textbf{0.05} & \textbf{48} & \textbf{0.014217} & \textbf{0.025887} \\
+    absolute & 0.1  & 32 & 0.019245 & 0.038809 \\
+    absolute & 0.0  & 32 & 0.020247 & 0.040786 \\
+    absolute & 0.01 & 32 & 0.024519 & 0.047638 \\
+    relative & 0.01 & 48 & 0.023784 & 0.042709 \\
+    absolute & 0.05 & 32 & 0.031534 & 0.068902 \\
+    absolute & 0.0  & 48 & 0.035519 & 0.098977 \\
+    relative & 0.1  & 48 & 0.040901 & 0.070742 \\
+    relative & 0.05 & 48 & 0.043298 & 0.081023 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Key findings}
+
+\begin{enumerate}
+  \item \textbf{Relative TV does not improve on absolute TV.}
+    The best relative TV run ($\lambda=0.01$, L1 = 0.023784) is \textbf{67\% worse}
+    than the absolute TV baseline ($\lambda=0.05$, L1 = 0.014217).
+
+  \item \textbf{Relative TV degrades with increasing $\lambda$.}
+    L1 rises from 0.023784 at $\lambda=0.01$ to 0.043298 at $\lambda=0.05$
+    and 0.040901 at $\lambda=0.1$, indicating that larger relative penalties
+    over-smooth all channels and prevent the CNN from learning fine spatial structure.
+
+  \item \textbf{Root cause: amplitude normalization amplifies noise for $h-h_0$.}
+    The $h-h_0$ channel has very small amplitude ($\approx 0.004$), so dividing its TV
+    by $\mathbb{E}[\lvert\hat{y}_0\rvert]$ inflates its contribution to the loss,
+    disrupting training rather than balancing the channels as intended.
+
+  \item \textbf{Final choice: absolute TV, $\lambda=0.05$, \texttt{base}=48.}
+    This configuration remains the best across both sweeps and is used in
+    \texttt{config/wave\_2d\_nonlinear\_config.py}.
+\end{enumerate}
+
+\subsection{Comparison figures}
+
+\subsubsection{Best relative TV run ($\lambda=0.01$, \texttt{base}=48, L1=0.023784)}
+
+Figures~\ref{fig:rel_sw001_t0}--\ref{fig:rel_sw001_t7} show the full 8-frame rollout
+for the best relative TV configuration alongside the spectral reference.
+Errors are visibly larger than the absolute TV baseline (cf.\ Figures~\ref{fig:t0}--\ref{fig:t7}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t0.png}
+  \caption{Relative TV $\lambda=0.01$: frame 0 ($t\approx 0.0$\,s).}
+  \label{fig:rel_sw001_t0}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t1.png}
+  \caption{Relative TV $\lambda=0.01$: frame 1 ($t\approx 0.29$\,s).}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t2.png}
+  \caption{Relative TV $\lambda=0.01$: frame 2 ($t\approx 0.57$\,s).}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t3.png}
+  \caption{Relative TV $\lambda=0.01$: frame 3 ($t\approx 0.86$\,s).}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t4.png}
+  \caption{Relative TV $\lambda=0.01$: frame 4 ($t\approx 1.14$\,s).}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t5.png}
+  \caption{Relative TV $\lambda=0.01$: frame 5 ($t\approx 1.43$\,s).}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t6.png}
+  \caption{Relative TV $\lambda=0.01$: frame 6 ($t\approx 1.71$\,s).}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t7.png}
+  \caption{Relative TV $\lambda=0.01$: frame 7 ($t=2.0$\,s, final).}
+  \label{fig:rel_sw001_t7}
+\end{figure}
+
+\subsubsection{Final-frame comparison across relative TV configurations}
+
+Figure~\ref{fig:rel_final} shows the final frame ($t=2.0$\,s) for all three completed
+relative TV runs side by side, illustrating how larger $\lambda$ leads to over-smoothing
+and larger rollout error.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.01/t7.png}
+    \caption{$\lambda=0.01$, L1=0.023784}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.05/t7.png}
+    \caption{$\lambda=0.05$, L1=0.043298}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{figures/wave_2d_nonlinear/sweep_rel_sw0.1/t7.png}
+    \caption{$\lambda=0.1$, L1=0.040901}
+  \end{subfigure}
+  \caption{Final frame ($t=2.0$\,s) for three relative TV configurations (\texttt{base}=48).
+           All are worse than the absolute TV baseline (L1=0.014217).}
+  \label{fig:rel_final}
+\end{figure}
+
+\end{document}

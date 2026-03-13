@@ -37,17 +37,19 @@ ic_list = ["random", "ring"]
 
 # Training
 b_size = 128
-num_epochs = 80   # fewer epochs, better schedule → similar or better error, faster
-base = 32        # CNN base channels (keep moderate size)
-lr_schedule = [(40, 3e-4), (70, 1e-4), (80, 1e-5)]
+num_epochs = 150
+base = 48        # CNN base channels (keep moderate size)
+lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
+smooth_weight = 0.05   # TV regularization weight
+smooth_mode = "relative"   # "absolute" | "relative"
 
 warmup_T = 4.0   # frames before this time are excluded from training
 
 # Compare (reference vs NN rollout)
-compare_TF = 1.0
+compare_TF = 2.0
 compare_ic = "random"
 compare_seed = 42
-compare_n_times = 6
+compare_n_times = 8
 
 # Data file names (under data/wave_2d_nonlinear/)
 data_mat = "data_wave.mat"

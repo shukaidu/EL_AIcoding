@@ -16,7 +16,8 @@ from ml.train_loop import get_device, plot_training_history
 from ml.snapshot import save_checkpoint
 
 
-def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule):
+def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule,
+                smooth_weight=0.0, smooth_mode="absolute"):
     crit = torch.nn.L1Loss(reduction="mean")
     hist_tr, hist_te = [], []
     for epoch in range(1, num_epochs + 1):
@@ -26,7 +27,22 @@ def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_sche
         model.train()
         tr = 0.0
         for i, t in train_loader:
-            loss = crit(model(i), t)
+            pred = model(i)
+            loss = crit(pred, t)
+            if smooth_weight > 0.0:
+                if smooth_mode == "relative":
+                    tv = 0.0
+                    for c in range(pred.shape[1]):
+                        pc = pred[:, c]                          # (B, H, W)
+                        gx_c = pc[:, :, 1:] - pc[:, :, :-1]
+                        gy_c = pc[:, 1:, :] - pc[:, :-1, :]
+                        scale_c = pc.abs().mean().clamp(min=1e-6)
+                        tv = tv + (gx_c.abs().mean() + gy_c.abs().mean()) / scale_c
+                    loss = loss + smooth_weight * tv
+                else:  # "absolute"
+                    gx = pred[:, :, :, 1:] - pred[:, :, :, :-1]   # 水平梯度
+                    gy = pred[:, :, 1:, :] - pred[:, :, :-1, :]   # 垂直梯度
+                    loss = loss + smooth_weight * (gx.abs().mean() + gy.abs().mean())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -43,7 +59,10 @@ def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_sche
 
 def _run(model, train_loader, test_loader, cfg, data_dir, **ckpt_extra):
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr_schedule[0][1])
-    hist_tr, hist_te = _run_epochs(model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule)
+    smooth_weight = getattr(cfg, "smooth_weight", 0.0)
+    smooth_mode = getattr(cfg, "smooth_mode", "absolute")
+    hist_tr, hist_te = _run_epochs(model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule,
+                                   smooth_weight=smooth_weight, smooth_mode=smooth_mode)
     save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te, os.path.join(data_dir, cfg.model_pth), **ckpt_extra)
     savemat(os.path.join(data_dir, cfg.error_mat), {"train_err": hist_tr, "test_err": hist_te})
     plot_training_history(hist_tr, hist_te, os.path.join(data_dir, "training_history.png"))
