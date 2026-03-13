@@ -139,7 +139,7 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
 \end{figure}
 
 \subsection{1D Burgers: FV vs.\ NN}
-Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=6}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $5.428$\,s, NN total $0.5120$\,s (speedup $10.6\times$).
+Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=6}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $7.038$\,s, NN total $0.7372$\,s (speedup $9.55\times$).
 
 \begin{figure}[H]
   \centering
@@ -159,7 +159,7 @@ Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, 
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $3.828$\,s, NN $0.1292$\,s (speedup $29.63\times$).
+Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $4.742$\,s, NN $0.2294$\,s (speedup $20.7\times$).
 
 \begin{figure}[H]
   \centering
@@ -179,7 +179,7 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 8 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=2.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN with TV regularization ($\lambda=0.05$, base=48, 150 epochs). Best configuration from parameter sweep over \texttt{smooth\_weight}\,$\in\{0,0.01,0.05,0.1\}$ and \texttt{base}\,$\in\{32,48\}$. L1 error (mean over frames) $0.014217$ (max frame $0.025887$). Runtimes (this run): Spectral $71.076$\,s, NN $4.240$\,s (speedup $16.8\times$).
+Comparison at 8 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=2.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN with TV regularization ($\lambda=0.05$, base=48, 150 epochs). Best configuration from parameter sweep over \texttt{smooth\_weight}\,$\in\{0,0.01,0.05,0.1\}$ and \texttt{base}\,$\in\{32,48\}$. L1 error (mean over frames) $0.040840$ (max frame $0.076145$). Runtimes (this run): Spectral $69.487$\,s, NN $4.5250$\,s (speedup $15.4\times$).
 
 \begin{figure}[H]
   \centering

@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python *)",
       "Bash(find * -name *.png -delete)",
-      "Bash(cp *)"
+      "Bash(cp *)",
+      "Bash(ls *)",
+      "Bash(echo *)"
     ]
   }
 }
