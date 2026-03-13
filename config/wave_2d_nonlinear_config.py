@@ -40,8 +40,8 @@ b_size = 128
 num_epochs = 150
 base = 48        # CNN base channels (keep moderate size)
 lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
-smooth_weight = 0.05   # TV regularization weight
-smooth_mode = "absolute"   # "absolute" | "relative"
+smooth_weight = [0.0, 0.02, 0.02]   # per-channel [h-h0, qx, qy]
+smooth_mode = "relative"   # "absolute" | "relative"
 
 warmup_T = 4.0   # frames before this time are excluded from training
 

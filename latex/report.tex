@@ -108,7 +108,8 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     Training samples & 6000 \\
     Epochs & 150 \\
     CNN base channels & 48 \\
-    TV smooth weight & 0.05 \\
+    TV smooth weight & [0.0, 0.02, 0.02] (per-channel: $h$-$h_0$, $q_x$, $q_y$) \\
+    TV smooth mode & relative \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -179,7 +180,28 @@ Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compar
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 8 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=2.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase $t\in[0,4]$ excluded). Reference: spectral; surrogate: CNN with TV regularization ($\lambda=0.05$, base=48, 150 epochs). Best configuration from parameter sweep over \texttt{smooth\_weight}\,$\in\{0,0.01,0.05,0.1\}$ and \texttt{base}\,$\in\{32,48\}$. L1 error (mean over frames) $0.040840$ (max frame $0.076145$). Runtimes (this run): Spectral $69.487$\,s, NN $4.5250$\,s (speedup $15.4\times$).
+Comparison at 8 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=3.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase excluded). Reference: spectral; surrogate: CNN with per-channel TV regularization (base=48, 150 epochs).
+
+\paragraph{TV regularization sweep.} We tuned the per-channel weight $\lambda=[\lambda_h, \lambda_{q_x}, \lambda_{q_y}]$ in relative mode. Results are summarized in Table~\ref{tab:tv_sweep}.
+
+\begin{table}[H]
+  \centering
+  \caption{Per-channel TV weight sweep results (relative mode, same training setup).}
+  \label{tab:tv_sweep}
+  \begin{tabular}{llrr}
+    \toprule
+    Configuration & $[\lambda_h,\,\lambda_{q_x},\,\lambda_{q_y}]$ & L1 mean & L1 max \\
+    \midrule
+    no-TV            & [0.00, 0.00, 0.00] & 0.019987 & 0.035442 \\
+    \textbf{rel-0.02 (selected)} & \textbf{[0.00, 0.02, 0.02]} & \textbf{0.017830} & \textbf{0.030551} \\
+    rel-0.05         & [0.00, 0.05, 0.05] & 0.018140 & 0.031533 \\
+    rel-0.05+h0.01   & [0.01, 0.05, 0.05] & 0.054181 & 0.126209 \\
+    rel-0.02+h0.01   & [0.01, 0.02, 0.02] & 0.033959 & 0.058720 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The best configuration is $\lambda=[0,0.02,0.02]$ (relative). Adding regularization on the $h$ channel hurts significantly, as its amplitude ($\sim 0.02$) is much smaller than $q_x,q_y$ ($\sim 0.7$) even in relative mode. Final model: L1 error mean $0.015657$ (max frame $0.027120$). Runtimes: Spectral $106.133$\,s, NN $5.9168$\,s (speedup $17.9\times$).
 
 \begin{figure}[H]
   \centering

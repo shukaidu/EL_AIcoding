@@ -29,20 +29,26 @@ def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_sche
         for i, t in train_loader:
             pred = model(i)
             loss = crit(pred, t)
-            if smooth_weight > 0.0:
+            # 支持标量或 per-channel 列表
+            C = pred.shape[1]
+            if isinstance(smooth_weight, (int, float)):
+                weights = [smooth_weight] * C
+            else:
+                weights = list(smooth_weight)
+            tv = 0.0
+            for c, w in enumerate(weights):
+                if w == 0.0:
+                    continue
+                pc = pred[:, c]                          # (B, H, W)
+                gx_c = pc[:, :, 1:] - pc[:, :, :-1]
+                gy_c = pc[:, 1:, :] - pc[:, :-1, :]
                 if smooth_mode == "relative":
-                    tv = 0.0
-                    for c in range(pred.shape[1]):
-                        pc = pred[:, c]                          # (B, H, W)
-                        gx_c = pc[:, :, 1:] - pc[:, :, :-1]
-                        gy_c = pc[:, 1:, :] - pc[:, :-1, :]
-                        scale_c = pc.abs().mean().clamp(min=1e-6)
-                        tv = tv + (gx_c.abs().mean() + gy_c.abs().mean()) / scale_c
-                    loss = loss + smooth_weight * tv
+                    scale_c = pc.abs().mean().clamp(min=1e-6)
+                    tv = tv + w * (gx_c.abs().mean() + gy_c.abs().mean()) / scale_c
                 else:  # "absolute"
-                    gx = pred[:, :, :, 1:] - pred[:, :, :, :-1]   # 水平梯度
-                    gy = pred[:, :, 1:, :] - pred[:, :, :-1, :]   # 垂直梯度
-                    loss = loss + smooth_weight * (gx.abs().mean() + gy.abs().mean())
+                    tv = tv + w * (gx_c.abs().mean() + gy_c.abs().mean())
+            if tv != 0.0:
+                loss = loss + tv
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
