@@ -228,7 +228,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     print(f"Saved {len(plot_indices)} figures to {out_dir}/  Spectral: {spec_time_list[-1]:.3f} s  NN: {nn_time_list[-1]:.4f} s")
 
 
-def _compare_wave_2d_nonlinear(data_dir, out_dir):
+def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     from pde.wave_2d_nonlinear import setup_wave2d_nonlinear, advance_tscreen
     import config.wave_2d_nonlinear_config as cfg
     from ml.models import CNN
@@ -237,16 +237,20 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
     nwd = cfg.nwd
     device = get_device()
     model_path = os.path.join(data_dir, cfg.model_pth)
-    if not os.path.isfile(model_path):
-        print(f"Model not found: {model_path}. Run: python -m ml.train --problem wave_2d_nonlinear")
-        return
-    ckpt = torch.load(model_path, map_location="cpu")
-    nst = cfg.nst
-    patch_side = cfg.patch_side
-    base = ckpt.get("base", 32)
-    model = CNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
-    load_checkpoint(model, model_path)
-    model.eval()
+    if model is None:
+        if not os.path.isfile(model_path):
+            print(f"Model not found: {model_path}. Run: python -m ml.train --problem wave_2d_nonlinear")
+            return
+        ckpt = torch.load(model_path, map_location="cpu")
+        nst = cfg.nst
+        patch_side = cfg.patch_side
+        base = ckpt.get("base", 32)
+        model = CNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
+        load_checkpoint(model, model_path)
+        model.eval()
+    else:
+        nst = cfg.nst
+        patch_side = cfg.patch_side
 
     h, qx, qy, rhs, dt, xx, yy = setup_wave2d_nonlinear(
         cfg.Lx, cfg.Ly, cfg.nx, cfg.ny,
@@ -334,6 +338,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir):
         plt.savefig(os.path.join(out_dir, f"t{idx}.png"), dpi=120)
         plt.close()
     print(f"Saved {len(plot_indices)} figures to {out_dir}/  Spectral: {spec_time_list[-1]:.3f} s  NN: {nn_time_list[-1]:.4f} s")
+    return float(np.mean(err_per_frame)), float(np.max(err_per_frame)), spec_elapsed, nn_elapsed
 
 
 def main():
