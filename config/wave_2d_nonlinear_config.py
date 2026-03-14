@@ -10,12 +10,12 @@ c = np.sqrt(g * h0)
 dx = Lx / nx
 dy = Ly / ny
 f_coriolis = 0.0
-nu_h = 0.0
 
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
 TF = 10.0
 TSCREEN = 10
 dt_internal = 0.5 * min(dx, dy) / c   # must match pde/wave_2d_nonlinear.py
+nu_h = 1e-3 * (min(dx, dy) ** 2) / dt_internal
 nu_q = 1e-3 * (min(dx, dy) ** 2) / dt_internal
 dt_samp = TSCREEN * dt_internal        # time between saved frames
 
@@ -30,15 +30,15 @@ patch_side = nwd + 2 * nst
 
 
 # Data generation
-nsamp = 6000
-ntest = 10
+nsamp = 5000
+ntest = 5
 ic_list = ["random", "ring"]
 #ic_list = ["random"]
 
 # Training
 b_size = 128
 num_epochs = 150
-base = 48        # CNN base channels (keep moderate size)
+base = 64        # CNN base channels (sweep best: base64_ep150)
 lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
 smooth_weight = [0.0, 0.02, 0.02]   # per-channel [h-h0, qx, qy]
 smooth_mode = "relative"   # "absolute" | "relative"
