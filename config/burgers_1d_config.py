@@ -17,15 +17,15 @@ njp = 100
 nst = int(np.floor(njp * CFL)) + 1
 nwd = 100
 # Initial condition
-alpha = 3.0
+alpha = 2.5
 u_mean = 0.0
-nu = 1e-2
+nu = 1e-3
 
 # ---------------------------------------------------------------------------
 # Data generation
 # ---------------------------------------------------------------------------
 nsamp = 5000
-n_trajectories = 5
+n_trajectories = 10
 seed_base = 42
 
 # ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ seed_base = 42
 b_size = 128
 num_epochs = 2500
 hidden_size = 128
-num_layers = 6
+num_layers = 5
 activation = "relu"  # relu|tanh|gelu|linear
 lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 

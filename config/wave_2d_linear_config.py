@@ -21,7 +21,7 @@ nst = int(np.floor(njp * dt_samp / dx)) + 1
 patch_side = 2 * nst + nwd
 
 # Data generation
-nsamp = 6000
+nsamp = 5000
 ntest = 10
 ic_list = ["random_white", "packet", "ring"]
 rng_seeds = list(range(1, 21))
@@ -30,7 +30,7 @@ rng_seeds = list(range(1, 21))
 b_size = 128
 num_epochs = 2500
 hidden_size = 256
-num_layers = 5
+num_layers = 1
 activation = "linear"  # relu|tanh|gelu|linear
 lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 

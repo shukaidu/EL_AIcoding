@@ -1,4 +1,4 @@
-\documentclass[11pt,a4paper]{article}
+﻿\documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb}
@@ -18,29 +18,27 @@
 \maketitle
 
 \begin{abstract}
-We report numerical experiments for data-driven surrogate models of three PDEs: (1)~1D viscous Burgers equation (finite-volume reference vs.\ MLP); (2)~2D linear wave equation (Fourier spectral reference vs.\ MLP); (3)~2D nonlinear rotating shallow water (Fourier spectral reference vs.\ CNN). For each problem we generate training data from the reference solver, train a neural network, and compare reference and NN rollouts in time. Training curves and comparison figures are included. All configuration parameters are centralized in config files; PDE and training pipelines are unified under a single codebase.
+We report numerical experiments for data-driven surrogate models of three PDEs: (1)~1D viscous Burgers equation (finite-volume reference vs.\ MLP); (2)~2D linear wave equation (Fourier spectral reference vs.\ MLP); (3)~2D nonlinear shallow water (Fourier spectral reference vs.\ CNN). For each problem we generate training data from the reference solver, train a neural network, and compare reference and NN rollouts in time. Training curves and comparison figures are included.
 \end{abstract}
 
-\section{Background}\label{sec:background}
+\section{Background}
 
 \subsection{Element learning}
-The goal is to learn a \emph{local} map (one time step or a few) on a small spatial element (patch) from data produced by a high-fidelity solver. At inference time, the learned map is applied in a rollout over the domain, yielding a fast surrogate that can be compared to the reference solver in accuracy and runtime.
+The goal is to learn a local map on a small spatial element or patch from data produced by a high-fidelity solver. At inference time, the learned map is applied in rollout form over the full domain, yielding a fast surrogate that can be compared to the reference solver in both accuracy and runtime.
 
 \subsection{Three test cases}
 \begin{itemize}
-  \item \textbf{1D Burgers (viscous):} $u_t + u u_x = \nu u_{xx}$ on $[0,L]$ with periodic BC. Reference: finite-volume Godunov flux + implicit diffusion. NN: MLP mapping a 1D patch (input length $2n_{\mathrm{st}}+n_{\mathrm{wd}}$) to interior ($n_{\mathrm{wd}}$ cells) over one step of $n_{\mathrm{jp}}$ time steps.
-  \item \textbf{2D linear wave:} $u_{tt} = c^2(u_{xx}+u_{yy})$ with periodic BC. Reference: Fourier pseudo-spectral with RK4 time stepping. NN: MLP mapping two channels (displacement and velocity) on a 2D patch to the interior over one frame.
-  \item \textbf{2D nonlinear shallow water:} Rotating shallow water in Fourier space with RK4. State $(h,q_x,q_y)$. Reference: spectral; NN: CNN (patch in, patch out) with optional TV regularization in the loss.
+  \item \textbf{1D Burgers (viscous):} $u_t + u u_x = \nu u_{xx}$ on $[0,L]$ with periodic BC. Reference: finite-volume Godunov flux with implicit diffusion. NN: MLP mapping a 1D patch to the interior window over one NN step.
+  \item \textbf{2D linear wave:} $u_{tt} = c^2(u_{xx}+u_{yy})$ with periodic BC. Reference: Fourier pseudo-spectral with RK4 time stepping. NN: MLP mapping patch data from displacement and velocity channels to the interior window.
+  \item \textbf{2D nonlinear shallow water:} state $(h,q_x,q_y)$ solved by a spectral reference model. NN: CNN patch-to-patch predictor trained with per-channel relative TV regularization.
 \end{itemize}
 
-\section{Experimental parameters}\label{sec:parameters}
-
-All parameters are defined in the \texttt{config/} module; below we summarize the main choices.
+\section{Experimental parameters}
 
 \subsection{1D Burgers}
 \begin{table}[H]
   \centering
-  \caption{Burgers: solver and data (from \texttt{config/burgers\_1d\_config.py}).}
+  \caption{Burgers configuration from \texttt{config/burgers\_1d\_config.py}.}
   \begin{tabular}{ll}
     \toprule
     Parameter & Value \\
@@ -48,17 +46,16 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
     Domain length $L$ & 2.0 \\
     Grid cells $n_x$ & 2000 \\
     CFL & 0.5 \\
-    Time step $\Delta t$ & CFL$\cdot L/n_x$ \\
-    Patch half-width $n_{\mathrm{st}}$ & $\lfloor n_{\mathrm{jp}}\cdot \mathrm{CFL}\rfloor+1$ (51) \\
+    Patch half-width $n_{\mathrm{st}}$ & 51 \\
     Interior width $n_{\mathrm{wd}}$ & 100 \\
     Jumps per NN step $n_{\mathrm{jp}}$ & 100 \\
-    Viscosity $\nu$ & $10^{-2}$ \\
-    IC decay $\alpha$, $u_{\mathrm{mean}}$ & 3.0, 0.0 \\
-    \midrule
+    Viscosity $\nu$ & $10^{-3}$ \\
+    IC decay $\alpha$ & 2.5 \\
     Training samples & 5000 \\
     Batch size & 128 \\
     Epochs & 2500 \\
-    Hidden size / layers & 128 / 6 (MLP) \\
+    Hidden size / layers & 128 / 5 \\
+    Activation & ReLU \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -66,23 +63,24 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
 \subsection{2D linear wave}
 \begin{table}[H]
   \centering
-  \caption{2D linear wave: grid and training (from \texttt{config/wave\_2d\_linear\_config.py}).}
+  \caption{Linear wave configuration from \texttt{config/wave\_2d\_linear\_config.py}.}
   \begin{tabular}{ll}
     \toprule
     Parameter & Value \\
     \midrule
-    Grid $N_X\times N_Y$ & $256\times 256$ \\
+    Grid $N_X\times N_Y$ & $256\times256$ \\
     Domain $L_x=L_y$ & $2\pi$ \\
     $\Delta t$ & $2\times 10^{-3}$ \\
     Wave speed $c$ & 1.0 \\
-    $T_{\mathrm{screen}}$ (steps per frame) & 50 \\
+    Steps per saved frame $T_{\mathrm{screen}}$ & 50 \\
     Frames per NN step $n_{\mathrm{jp}}$ & 2 \\
-    Patch interior $n_{\mathrm{wd}}$ & 32 \\
-    Compare IC & ring \\
-    \midrule
-    Training samples & 6000 \\
+    Patch half-width $n_{\mathrm{st}}$ & 9 \\
+    Interior width $n_{\mathrm{wd}}$ & 32 \\
+    Training samples & 5000 \\
     Epochs & 2500 \\
-    Hidden size / layers & 256 / 5 (MLP, identity output) \\
+    Hidden size / layers & 256 / 1 \\
+    Activation & linear \\
+    Compare IC & ring \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -90,34 +88,34 @@ All parameters are defined in the \texttt{config/} module; below we summarize th
 \subsection{2D nonlinear shallow water}
 \begin{table}[H]
   \centering
-  \caption{2D nonlinear: grid and training (from \texttt{config/wave\_2d\_nonlinear\_config.py}).}
+  \caption{Nonlinear shallow-water configuration from \texttt{config/wave\_2d\_nonlinear\_config.py}.}
   \begin{tabular}{ll}
     \toprule
     Parameter & Value \\
     \midrule
-    Grid $n_x\times n_y$ & $256\times 256$ \\
-    $L_x=L_y$ & $2\pi$ \\
+    Grid $n_x\times n_y$ & $256\times256$ \\
+    Domain $L_x=L_y$ & $2\pi$ \\
     $g$, $h_0$ & 9.8, 1.0 \\
-    $T_{\mathrm{screen}}$ & 10 \\
-    $n_{\mathrm{wd}}$ & 32 \\
-    Warmup $T_{\mathrm{warmup}}$ & 4.0 (early frames excluded) \\
-    Compare $T_F$ & 2.0 \\
+    Steps per saved frame $T_{\mathrm{screen}}$ & 10 \\
+    Patch half-width $n_{\mathrm{st}}$ & 10 \\
+    Interior width $n_{\mathrm{wd}}$ & 32 \\
+    Warmup time & 4.0 \\
+    Compare $T_F$ & 3.0 \\
     Compare frames & 8 \\
     Compare IC & random \\
-    \midrule
-    Training samples & 6000 \\
+    Training samples & 5000 \\
     Epochs & 150 \\
     CNN base channels & 48 \\
-    TV smooth weight & [0.0, 0.02, 0.02] (per-channel: $h$-$h_0$, $q_x$, $q_y$) \\
+    TV smooth weight & [0.0, 0.02, 0.02] \\
     TV smooth mode & relative \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\section{Results}\label{sec:results}
+\section{Results}
 
 \subsection{Training history}
-Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the three problems. Burgers and 2D linear use MLP; 2D nonlinear uses a residual CNN (3 in/out channels).
+Figure~\ref{fig:training} shows the train and test loss versus epoch for the three problems.
 
 \begin{figure}[H]
   \centering
@@ -135,18 +133,17 @@ Figure~\ref{fig:training} shows train and test loss (L1) vs.\ epoch for the thre
     \includegraphics[width=\textwidth]{figures/wave_2d_nonlinear/training_history.png}
     \caption{2D nonlinear}
   \end{subfigure}
-  \caption{Training and test loss (log scale) vs.\ epoch.}
+  \caption{Training and test loss versus epoch.}
   \label{fig:training}
 \end{figure}
 
-\subsection{1D Burgers: FV vs.\ NN}
-Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, \texttt{compare\_n\_times=6}). Reference: FV solver; surrogate: MLP rollout. Runtimes (this run): FV total $7.038$\,s, NN total $0.7372$\,s (speedup $9.55\times$).
+\subsection{1D Burgers: FV vs. NN}
+Comparison at 6 output times over $t\in[0,2]$ with \texttt{compare\_t\_end=2.0}. Runtime for this run: FV total $4.166$\,s, NN total $0.3310$\,s, speedup $12.59\times$.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t0.png}
-  \caption{Burgers: $t=0$ (initial).}
-  \label{fig:burgers_t0}
+  \caption{Burgers: initial frame.}
 \end{figure}
 \begin{figure}[H]
   \centering
@@ -156,70 +153,48 @@ Comparison at 6 output times $t\in[0,2]$ (config: \texttt{compare\_t\_end=2.0}, 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.7\textwidth]{figures/burgers_1d/t5.png}
-  \caption{Burgers: final frame ($t=2.0$).}
+  \caption{Burgers: final frame.}
 \end{figure}
 
-\subsection{2D linear wave: Spectral vs.\ NN}
-Comparison at 6 aligned frames (config: \texttt{compare\_TF=1.0}, \texttt{compare\_ic=ring}, $n_{\mathrm{jp}}=2$). Reference: Fourier spectral; surrogate: MLP over patches. Runtimes (this run): Spectral $4.742$\,s, NN $0.2294$\,s (speedup $20.7\times$).
+\subsection{2D linear wave: Spectral vs. NN}
+Comparison at 6 aligned frames with \texttt{compare\_TF=1.0} and \texttt{compare\_ic=ring}. Runtime for this run: spectral $3.620$\,s, NN $0.0975$\,s, speedup $37.13\times$.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t0.png}
-  \caption{2D linear: frame 0 (u and v, spectral vs.\ NN).}
-  \label{fig:linear_t0}
+  \caption{2D linear wave: initial frame.}
 \end{figure}
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t3.png}
-  \caption{2D linear: mid-run frame.}
+  \caption{2D linear wave: mid-run frame.}
 \end{figure}
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{figures/wave_2d_linear/t5.png}
-  \caption{2D linear: final frame.}
+  \caption{2D linear wave: final frame.}
 \end{figure}
 
-\subsection{2D nonlinear shallow water: Spectral vs.\ NN}
-Comparison at 8 aligned frames for state $(h-h_0,q_x,q_y)$ (config: \texttt{compare\_TF=3.0}, \texttt{compare\_ic=random}, $n_{\mathrm{jp}}=2$). Both reference and NN rollout start from $T=4.0$ (warmup phase excluded). Reference: spectral; surrogate: CNN with per-channel TV regularization (base=48, 150 epochs).
-
-\paragraph{TV regularization sweep.} We tuned the per-channel weight $\lambda=[\lambda_h, \lambda_{q_x}, \lambda_{q_y}]$ in relative mode. Results are summarized in Table~\ref{tab:tv_sweep}.
-
-\begin{table}[H]
-  \centering
-  \caption{Per-channel TV weight sweep results (relative mode, same training setup).}
-  \label{tab:tv_sweep}
-  \begin{tabular}{llrr}
-    \toprule
-    Configuration & $[\lambda_h,\,\lambda_{q_x},\,\lambda_{q_y}]$ & L1 mean & L1 max \\
-    \midrule
-    no-TV            & [0.00, 0.00, 0.00] & 0.019987 & 0.035442 \\
-    \textbf{rel-0.02 (selected)} & \textbf{[0.00, 0.02, 0.02]} & \textbf{0.017830} & \textbf{0.030551} \\
-    rel-0.05         & [0.00, 0.05, 0.05] & 0.018140 & 0.031533 \\
-    rel-0.05+h0.01   & [0.01, 0.05, 0.05] & 0.054181 & 0.126209 \\
-    rel-0.02+h0.01   & [0.01, 0.02, 0.02] & 0.033959 & 0.058720 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-The best configuration is $\lambda=[0,0.02,0.02]$ (relative). Adding regularization on the $h$ channel hurts significantly, as its amplitude ($\sim 0.02$) is much smaller than $q_x,q_y$ ($\sim 0.7$) even in relative mode. Final model: L1 error mean $0.015657$ (max frame $0.027120$). Runtimes: Spectral $106.133$\,s, NN $5.9168$\,s (speedup $17.9\times$).
+\subsection{2D nonlinear shallow water: Spectral vs. NN}
+Comparison at 8 aligned frames for $(h-h_0,q_x,q_y)$ with \texttt{compare\_TF=3.0} and \texttt{compare\_ic=random}. Both rollouts start after warmup time $T=4.0$. Final rollout metrics for this run: mean L1 error $0.034743$, max-frame L1 error $0.077908$, spectral runtime $116.512$\,s, NN runtime $6.8015$\,s, speedup $17.13\times$.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t0.png}
-  \caption{2D nonlinear: $t=0$ (three components, spectral vs.\ NN).}
-  \label{fig:nonlinear_t0}
+  \caption{2D nonlinear shallow water: initial frame.}
 \end{figure}
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t3.png}
-  \caption{2D nonlinear: mid-run frame ($t\approx 1.0$\,s).}
+  \caption{2D nonlinear shallow water: mid-run frame.}
 \end{figure}
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/wave_2d_nonlinear/t7.png}
-  \caption{2D nonlinear: final frame ($t=2.0$\,s).}
+  \caption{2D nonlinear shallow water: final frame.}
 \end{figure}
 
-\section{Conclusion}\label{sec:conclusion}
-The pipelines for 1D Burgers, 2D linear wave, and 2D nonlinear shallow water run successfully with a unified workflow: \texttt{gen\_data.py}, \texttt{ml.train}, and \texttt{compare.py} are invoked with \texttt{--problem} to select the case. All configuration is in \texttt{config/}; PDE modules take parameters from config and contain no duplicate defaults. The reported figures show that the NN surrogates track the reference solutions and achieve noticeable speedups in the comparison runs.
+\section{Conclusion}
+The three pipelines run successfully with a unified workflow: \texttt{gen\_data.py}, \texttt{python -m ml.train}, and \texttt{compare.py} are all selected through the shared \texttt{--problem} interface. The rebuilt figures show that the learned surrogates track the reference solutions while delivering clear runtime savings in all three cases.
+
 \end{document}
