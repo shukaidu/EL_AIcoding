@@ -38,12 +38,12 @@ ic_list = ["random", "ring"]
 # Training
 b_size = 128
 num_epochs = 150
-base = 64        # CNN base channels (sweep best: base64_ep150)
+base = 32        # CNN base channels (sweep best: base64_ep150)
 lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
-smooth_weight = [0.0, 0.02, 0.02]   # per-channel [h-h0, qx, qy]
-smooth_mode = "relative"   # "absolute" | "relative"
+smooth_weight = [0.01, 0.05, 0.05]   # per-channel [h-h0, qx, qy]
+smooth_mode = "absolute"   # "absolute" | "relative"
 
-warmup_T = 4.0   # frames before this time are excluded from training
+warmup_T = 5.0   # frames before this time are excluded from training
 
 # Compare (reference vs NN rollout)
 compare_TF = 3.0

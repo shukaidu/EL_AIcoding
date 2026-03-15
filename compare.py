@@ -235,6 +235,8 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     from ml.snapshot import load_checkpoint
 
     nwd = cfg.nwd
+    nst = cfg.nst
+    patch_side = cfg.patch_side
     device = get_device()
     model_path = os.path.join(data_dir, cfg.model_pth)
     if model is None:
@@ -242,15 +244,10 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
             print(f"Model not found: {model_path}. Run: python -m ml.train --problem wave_2d_nonlinear")
             return
         ckpt = torch.load(model_path, map_location="cpu")
-        nst = cfg.nst
-        patch_side = cfg.patch_side
         base = ckpt.get("base", 32)
         model = CNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
         load_checkpoint(model, model_path)
         model.eval()
-    else:
-        nst = cfg.nst
-        patch_side = cfg.patch_side
 
     h, qx, qy, rhs, dt, xx, yy = setup_wave2d_nonlinear(
         cfg.Lx, cfg.Ly, cfg.nx, cfg.ny,
