@@ -128,12 +128,13 @@ def run_wave_2d_linear(data_dir):
 
 
 def _wave2d_nonlinear_single_run(args):
-    """Top-level for multiprocessing pickle on Windows. args = (seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, f_coriolis, nu_h, nu_q). Returns (t_hist, U_hist)."""
-    seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, f_coriolis, nu_h, nu_q = args
+    """Top-level for multiprocessing pickle on Windows. args = (seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff). Returns (t_hist, U_hist)."""
+    seed, ic, TF, TSCREEN, nx, ny, Lx, Ly, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff = args
     from pde.wave_2d_nonlinear import wave2d_spectral
     t_hist, U_hist, _, _, _, _, _, _ = wave2d_spectral(
         Lx, Ly, nx, ny, TF, TSCREEN,
         g=g, h0=h0, f_coriolis=f_coriolis, nu_h=nu_h, nu_q=nu_q,
+        nudging_coeff=nudging_coeff,
         initial_condition=ic, rng_seed=seed,
     )
     return t_hist, U_hist
@@ -144,7 +145,7 @@ def run_wave_2d_nonlinear(data_dir):
 
     run_configs = [
         (i + 1, cfg.ic_list[i % len(cfg.ic_list)], cfg.TF, cfg.TSCREEN, cfg.nx, cfg.ny, cfg.Lx, cfg.Ly,
-         cfg.g, cfg.h0, cfg.f_coriolis, cfg.nu_h, cfg.nu_q)
+         cfg.g, cfg.h0, cfg.f_coriolis, cfg.nu_h, cfg.nu_q, cfg.nudging_coeff)
         for i in range(cfg.ntest)
     ]
     n_workers = min(cfg.ntest, max(1, cpu_count() - 1))

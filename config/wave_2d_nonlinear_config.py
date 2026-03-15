@@ -10,6 +10,7 @@ c = np.sqrt(g * h0)
 dx = Lx / nx
 dy = Ly / ny
 f_coriolis = 0.0
+nudging_coeff = 0.0  # h nudging toward h0 (0 = disabled)
 
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
 TF = 10.0

@@ -51,7 +51,7 @@ def advance_tscreen(h, qx, qy, rhs, dt, TSCREEN):
     return h, qx, qy
 
 
-def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, initial_condition, rng_seed):
+def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff=0.0, initial_condition, rng_seed):
     """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, dt, xx, yy)。"""
     rng = np.random.default_rng(rng_seed)
     c = np.sqrt(g * h0)
@@ -94,7 +94,8 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, ini
         u = qx / h_safe
         v = qy / h_safe
         dhdt = -(Dx_lin(qx) + Dy_lin(qy))
-        dhdt = dhdt - 1.0 * (h - h0)  # Newtonian height relaxation for stability
+        if nudging_coeff != 0.0:
+            dhdt = dhdt - nudging_coeff * (h - h0)  # nudging toward h0
         Fxx = qx * u + 0.5 * g * h**2
         Fxy = qx * v
         Gyx = qy * u
@@ -124,6 +125,7 @@ def wave2d_spectral(
     f_coriolis,
     nu_h,
     nu_q,
+    nudging_coeff=0.0,
     initial_condition,
     rng_seed,
     verbose=False,
@@ -136,6 +138,7 @@ def wave2d_spectral(
     h, qx, qy, rhs, dt, xx, yy = setup_wave2d_nonlinear(
         Lx, Ly, nx, ny,
         g=g, h0=h0, f_coriolis=f_coriolis, nu_h=nu_h, nu_q=nu_q,
+        nudging_coeff=nudging_coeff,
         initial_condition=initial_condition, rng_seed=rng_seed,
     )
 

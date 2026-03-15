@@ -252,6 +252,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     h, qx, qy, rhs, dt, xx, yy = setup_wave2d_nonlinear(
         cfg.Lx, cfg.Ly, cfg.nx, cfg.ny,
         g=cfg.g, h0=cfg.h0, f_coriolis=cfg.f_coriolis, nu_h=cfg.nu_h, nu_q=cfg.nu_q,
+        nudging_coeff=cfg.nudging_coeff,
         initial_condition=cfg.compare_ic, rng_seed=cfg.compare_seed,
     )
 
