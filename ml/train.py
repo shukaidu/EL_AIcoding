@@ -17,8 +17,9 @@ from ml.snapshot import save_checkpoint
 
 
 def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule,
-                smooth_weight=0.0, smooth_mode="absolute"):
+                smooth_weight=0.0, smooth_mode="absolute", param_ratio=None):
     crit = torch.nn.L1Loss(reduction="mean")
+    crit_none = torch.nn.L1Loss(reduction="none")
     hist_tr, hist_te = [], []
     for epoch in range(1, num_epochs + 1):
         lr = next(lr for e, lr in lr_schedule if epoch <= e)
@@ -28,7 +29,11 @@ def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_sche
         tr = 0.0
         for i, t in train_loader:
             pred = model(i)
-            loss = crit(pred, t)
+            if param_ratio is not None:
+                w = torch.tensor(param_ratio, dtype=torch.float32, device=pred.device)
+                loss = (crit_none(pred, t).mean(dim=(0, 2, 3)) * w).sum()
+            else:
+                loss = crit(pred, t)
             # 支持标量或 per-channel 列表
             C = pred.shape[1]
             if isinstance(smooth_weight, (int, float)):
@@ -57,7 +62,12 @@ def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_sche
         hist_tr.append(tr)
         model.eval()
         with torch.no_grad():
-            te = sum(crit(model(i), t).item() for i, t in test_loader) / len(test_loader)
+            if param_ratio is not None:
+                w = torch.tensor(param_ratio, dtype=torch.float32, device=next(model.parameters()).device)
+                te = sum((crit_none(model(i), t).mean(dim=(0, 2, 3)) * w).sum().item()
+                         for i, t in test_loader) / len(test_loader)
+            else:
+                te = sum(crit(model(i), t).item() for i, t in test_loader) / len(test_loader)
         hist_te.append(te)
         print(f"Epoch [{epoch}/{num_epochs}], lr={lr:.0e}, Train: {tr:.6f}, Test: {te:.6f}")
     return hist_tr, hist_te
@@ -67,8 +77,10 @@ def _run(model, train_loader, test_loader, cfg, data_dir, **ckpt_extra):
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr_schedule[0][1])
     smooth_weight = getattr(cfg, "smooth_weight", 0.0)
     smooth_mode = getattr(cfg, "smooth_mode", "absolute")
+    param_ratio = getattr(cfg, "param_ratio", None)
     hist_tr, hist_te = _run_epochs(model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule,
-                                   smooth_weight=smooth_weight, smooth_mode=smooth_mode)
+                                   smooth_weight=smooth_weight, smooth_mode=smooth_mode,
+                                   param_ratio=param_ratio)
     save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te, os.path.join(data_dir, cfg.model_pth), **ckpt_extra)
     savemat(os.path.join(data_dir, cfg.error_mat), {"train_err": hist_tr, "test_err": hist_te})
     plot_training_history(hist_tr, hist_te, os.path.join(data_dir, "training_history.png"))

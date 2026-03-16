@@ -34,8 +34,7 @@
 3. 训练：`python -m ml.train --problem <问题名>`
 4. 对比：`python compare.py --problem <问题名>`
 5. 拷图：将 `data/<问题名>/training_history.png` 和 `data/<问题名>/compare/*.png` 拷到 `latex/figures/<问题名>/`
-
-注意：pipeline 到拷图结束即可；仓库中不再维护 `latex/report.tex`，也不需要编译 PDF。
+6. 更新报告：将 `latex/report.tex` 中对应问题的参数表和结果数值更新到最新值
 
 ## 并行与顺序
 - 数据生成三个问题可并行执行

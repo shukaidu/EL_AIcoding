@@ -19,7 +19,7 @@ def _gen_dist_2d(xgrid, ygrid, alpha, rng):
     X -= np.mean(X)
     max_abs = np.max(np.abs(X))
     if max_abs > 0:
-        X = 0.9 * X / max_abs
+        X = 0.5 * X / max_abs
     return X
 
 

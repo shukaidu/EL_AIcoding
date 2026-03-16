@@ -10,13 +10,13 @@ c = np.sqrt(g * h0)
 dx = Lx / nx
 dy = Ly / ny
 f_coriolis = 0.0
-nudging_coeff = 0.0  # h nudging toward h0 (0 = disabled)
+nudging_coeff = 1.0  # h nudging toward h0 (0 = disabled)
 
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
 TF = 10.0
-TSCREEN = 10
+TSCREEN = 20
 dt_internal = 0.5 * min(dx, dy) / c   # must match pde/wave_2d_nonlinear.py
-nu_h = 1e-3 * (min(dx, dy) ** 2) / dt_internal
+nu_h = 0.0
 nu_q = 1e-3 * (min(dx, dy) ** 2) / dt_internal
 dt_samp = TSCREEN * dt_internal        # time between saved frames
 
@@ -25,8 +25,8 @@ nwd = 32
 njp = 2
 
 # Patch stencil: halo per side from CFL (wave travels ~c over njp*dt_samp); CNN needs (patch_side - nwd) divisible by 4 and >= 4
-nst_min = c * njp * dt_samp / dx
-nst = max(2, int(np.ceil(nst_min / 2)) * 2)   # smallest even integer >= nst_min, at least 2 for CNN
+_nst_min = round(c * njp * dt_samp / dx)   # ≈ njp*TSCREEN/2 (exact int, round guards float drift)
+nst = 4 * (_nst_min // 4 + 1)
 patch_side = nwd + 2 * nst
 
 
@@ -37,14 +37,15 @@ ic_list = ["random", "ring"]
 #ic_list = ["random"]
 
 # Training
-b_size = 128
+b_size = 100
 num_epochs = 150
 base = 32        # CNN base channels (sweep best: base64_ep150)
 lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
-smooth_weight = [0.01, 0.05, 0.05]   # per-channel [h-h0, qx, qy]
+smooth_weight = [1e-2, 0.0, 0.0]      # per-channel [h-h0, qx, qy]
 smooth_mode = "absolute"   # "absolute" | "relative"
+param_ratio   = [10.0, 1.0, 1.0]     # h 通道数据损失×10
 
-warmup_T = 5.0   # frames before this time are excluded from training
+warmup_T = 6.0   # frames before this time are excluded from training
 
 # Compare (reference vs NN rollout)
 compare_TF = 3.0

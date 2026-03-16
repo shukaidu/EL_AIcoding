@@ -96,18 +96,22 @@ The goal is to learn a local map on a small spatial element or patch from data p
     Grid $n_x\times n_y$ & $256\times256$ \\
     Domain $L_x=L_y$ & $2\pi$ \\
     $g$, $h_0$ & 9.8, 1.0 \\
-    Steps per saved frame $T_{\mathrm{screen}}$ & 10 \\
-    Patch half-width $n_{\mathrm{st}}$ & 10 \\
+    Steps per saved frame $T_{\mathrm{screen}}$ & 20 \\
+    Patch half-width $n_{\mathrm{st}}$ & 24 \\
     Interior width $n_{\mathrm{wd}}$ & 32 \\
-    Warmup time & 4.0 \\
+    Viscosity $\nu_h$ & 0 \\
+    Nudging coefficient & 1.0 \\
+    Batch size & 100 \\
+    Warmup time & 6.0 \\
     Compare $T_F$ & 3.0 \\
     Compare frames & 8 \\
     Compare IC & random \\
     Training samples & 5000 \\
     Epochs & 150 \\
-    CNN base channels & 48 \\
-    TV smooth weight & [0.0, 0.02, 0.02] \\
-    TV smooth mode & relative \\
+    CNN base channels & 32 \\
+    TV smooth weight & [1e-2, 0, 0] \\
+    TV smooth mode & absolute \\
+    Data loss channel weights & [10, 1, 1] \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -176,7 +180,7 @@ Comparison at 6 aligned frames with \texttt{compare\_TF=1.0} and \texttt{compare
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs. NN}
-Comparison at 8 aligned frames for $(h-h_0,q_x,q_y)$ with \texttt{compare\_TF=3.0} and \texttt{compare\_ic=random}. Both rollouts start after warmup time $T=4.0$. Final rollout metrics for this run: mean L1 error $0.034743$, max-frame L1 error $0.077908$, spectral runtime $116.512$\,s, NN runtime $6.8015$\,s, speedup $17.13\times$.
+Comparison at 8 aligned frames for $(h-h_0,q_x,q_y)$ with \texttt{compare\_TF=3.0} and \texttt{compare\_ic=random}. Both rollouts start after warmup time $T=6.0$. Final rollout metrics for this run: mean L1 error $0.008592$, max-frame L1 error $0.015684$, spectral runtime $108.152$\,s, NN runtime $5.6242$\,s, speedup $19.23\times$.
 
 \begin{figure}[H]
   \centering
