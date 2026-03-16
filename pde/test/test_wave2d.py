@@ -1,4 +1,10 @@
-"""Test wave2d_main (linear) and wave2d_spectral (nonlinear), save gifs to pde/test/."""
+"""Test wave2d_main (linear) and wave2d_spectral (nonlinear), save gifs to pde/test/.
+
+Usage:
+  python pde/test/test_wave2d.py             # both
+  python pde/test/test_wave2d.py linear      # linear only
+  python pde/test/test_wave2d.py nonlinear   # nonlinear only
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -6,6 +12,43 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 HERE = os.path.dirname(__file__)
+args = sys.argv[1:]
+run_linear    = not args or "linear"    in args
+run_nonlinear = not args or "nonlinear" in args
+
+
+def save_gif_multi(U_history, t_history, Lx, Ly, var_names, name):
+    """Save GIF with 1×n_vars subplots for a (nx, ny, n_vars, n_frames) array."""
+    nx, ny, n_vars, n_frames = U_history.shape
+    fig, axes = plt.subplots(1, n_vars, figsize=(13, 4))
+    ims, ax_titles = [], []
+    for i, ax in enumerate(axes):
+        data0 = U_history[:, :, i, 0]
+        vmax0 = np.max(np.abs(data0)) or 1.0
+        im = ax.imshow(data0.T, origin="lower", cmap="RdBu_r",
+                       vmin=-vmax0, vmax=vmax0, extent=[0, Lx, 0, Ly])
+        t = ax.set_title(f"{var_names[i]}  t={t_history[0]:.3f}")
+        fig.colorbar(im, ax=ax)
+        ims.append(im)
+        ax_titles.append(t)
+
+    def update(frame):
+        artists = []
+        for i, im in enumerate(ims):
+            data = U_history[:, :, i, frame]
+            vmax = np.max(np.abs(data)) or 1.0
+            im.set_data(data.T)
+            im.set_clim(-vmax, vmax)
+            artists.append(im)
+            ax_titles[i].set_text(f"{var_names[i]}  t={t_history[frame]:.3f}")
+            artists.append(ax_titles[i])
+        return artists
+
+    ani = animation.FuncAnimation(fig, update, frames=n_frames, interval=50, blit=True)
+    out = os.path.join(HERE, name)
+    ani.save(out, writer="pillow", fps=20)
+    plt.close()
+    print(f"Saved: {out}")
 
 
 def save_gif(u_history, t_history, Lx, Ly, name):
@@ -31,25 +74,27 @@ def save_gif(u_history, t_history, Lx, Ly, name):
     print(f"Saved: {out}")
 
 
-# --- Linear ---
-from pde.wave_2d_linear import wave2d_main
-import config.wave_2d_linear_config as lcfg
+if run_linear:
+    from pde.wave_2d_linear import wave2d_main
+    import config.wave_2d_linear_config as lcfg
 
-t_hist, u_hist, _, xx, yy, _ = wave2d_main(
-    lcfg.NX, lcfg.NY, lcfg.Lx, lcfg.Ly, lcfg.dt, TF=10.0, TSCREEN=lcfg.TSCREEN,
-    c=lcfg.c, initial_condition="ring", rng_seed=42, verbose=True,
-)
-print(f"[linear] n_frames={u_hist.shape[2]}, t_end={t_hist[-1]:.4f}")
-save_gif(u_hist, t_hist, lcfg.Lx, lcfg.Ly, "test_wave2d_linear.gif")
+    t_hist, u_hist, _, xx, yy, _ = wave2d_main(
+        lcfg.NX, lcfg.NY, lcfg.Lx, lcfg.Ly, lcfg.dt, TF=10.0, TSCREEN=lcfg.TSCREEN,
+        c=lcfg.c, initial_condition="ring", rng_seed=42, verbose=True,
+    )
+    print(f"[linear] n_frames={u_hist.shape[2]}, t_end={t_hist[-1]:.4f}")
+    save_gif(u_hist, t_hist, lcfg.Lx, lcfg.Ly, "test_wave2d_linear.gif")
 
-# --- Nonlinear ---
-from pde.wave_2d_nonlinear import wave2d_spectral
-import config.wave_2d_nonlinear_config as ncfg
+if run_nonlinear:
+    from pde.wave_2d_nonlinear import wave2d_spectral
+    import config.wave_2d_nonlinear_config as ncfg
 
-t_hist, U_hist, xx, yy, _, _, _, _ = wave2d_spectral(
-    ncfg.Lx, ncfg.Ly, ncfg.nx, ncfg.ny, TF=10.0, TSCREEN=ncfg.TSCREEN,
-    g=ncfg.g, h0=ncfg.h0, f_coriolis=ncfg.f_coriolis, nu_h=ncfg.nu_h, nu_q=ncfg.nu_q,
-    initial_condition="random", rng_seed=42, verbose=True,
-)
-print(f"[nonlinear] n_frames={U_hist.shape[3]}, t_end={t_hist[-1]:.4f}")
-save_gif(U_hist[:, :, 0, :], t_hist, ncfg.Lx, ncfg.Ly, "test_wave2d_nonlinear.gif")
+    t_hist, U_hist, xx, yy, _, _, _, _ = wave2d_spectral(
+        ncfg.Lx, ncfg.Ly, ncfg.nx, ncfg.ny, TF=10.0, TSCREEN=ncfg.TSCREEN,
+        g=ncfg.g, h0=ncfg.h0, f_coriolis=ncfg.f_coriolis, nu_h=ncfg.nu_h, nu_q=ncfg.nu_q,
+        nudging_coeff=ncfg.nudging_coeff,
+        initial_condition="random", rng_seed=42, verbose=True,
+    )
+    print(f"[nonlinear] n_frames={U_hist.shape[3]}, t_end={t_hist[-1]:.4f}")
+    save_gif_multi(U_hist, t_hist, ncfg.Lx, ncfg.Ly,
+                   ["h-h0", "qx", "qy"], "test_wave2d_nonlinear.gif")

@@ -5,6 +5,7 @@ import re
 import time
 import argparse
 import numpy as np
+from tqdm import tqdm
 import torch
 import matplotlib
 matplotlib.use("Agg")
@@ -75,7 +76,7 @@ def _compare_burgers_1d(data_dir, out_dir):
     fv_time_list = [0.0]
     nn_time_list = [0.0]
     fv_elapsed = nn_elapsed = 0.0
-    for _ in range(n_nn_steps):
+    for _ in tqdm(range(n_nn_steps), desc="burgers_1d rollout"):
         t0 = time.perf_counter()
         for _ in range(njp):
             u_fv = integrate_burger(u_fv, dt, dx, nu, A=A)
@@ -178,7 +179,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     spec_time_list = [0.0]
     nn_time_list = [0.0]
     spec_elapsed = nn_elapsed = 0.0
-    for _ in range(n_nn_steps):
+    for _ in tqdm(range(n_nn_steps), desc="wave_2d_linear rollout"):
         t0 = time.perf_counter()
         uhat, vhat, u, v = advance_tscreen(uhat, vhat, omega2, cfg.dt, steps_per_nn)
         spec_elapsed += time.perf_counter() - t0
@@ -289,7 +290,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     spec_time_list = [0.0]
     nn_time_list = [0.0]
     spec_elapsed = nn_elapsed = 0.0
-    for _ in range(n_nn_steps):
+    for _ in tqdm(range(n_nn_steps), desc="wave_2d_nonlinear rollout"):
         t0 = time.perf_counter()
         h, qx, qy = advance_tscreen(h, qx, qy, rhs, dt, steps_per_nn)
         spec_elapsed += time.perf_counter() - t0

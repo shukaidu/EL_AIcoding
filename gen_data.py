@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 from scipy.io import savemat
 from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
 
 _repo_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _repo_root)
@@ -47,10 +48,11 @@ def run_burgers_1d(data_dir):
     run_configs = [(seed, cfg.nsamp // cfg.n_trajectories) for seed in seeds]
     n_workers = min(cfg.n_trajectories, max(1, cpu_count() - 1))
     if n_workers <= 1:
-        results = [_burgers_1d_single_trajectory(c) for c in run_configs]
+        results = [_burgers_1d_single_trajectory(c) for c in tqdm(run_configs, desc="burgers_1d trajectories")]
     else:
         with Pool(n_workers) as pool:
-            results = pool.map(_burgers_1d_single_trajectory, run_configs)
+            results = list(tqdm(pool.imap_unordered(_burgers_1d_single_trajectory, run_configs),
+                                total=cfg.n_trajectories, desc="burgers_1d trajectories"))
 
     all_inputs = []
     all_outputs = []
@@ -86,10 +88,11 @@ def run_wave_2d_linear(data_dir):
     ]
     n_workers = min(cfg.ntest, max(1, cpu_count() - 1))
     if n_workers <= 1:
-        results = [_wave2d_linear_single_run(c) for c in run_configs]
+        results = [_wave2d_linear_single_run(c) for c in tqdm(run_configs, desc="wave_2d_linear runs")]
     else:
         with Pool(n_workers) as pool:
-            results = pool.map(_wave2d_linear_single_run, run_configs)
+            results = list(tqdm(pool.imap_unordered(_wave2d_linear_single_run, run_configs),
+                                total=cfg.ntest, desc="wave_2d_linear runs"))
 
     input_arr_u = np.zeros((cfg.patch_side, cfg.patch_side, cfg.nsamp), dtype=np.float32)
     input_arr_v = np.zeros((cfg.patch_side, cfg.patch_side, cfg.nsamp), dtype=np.float32)
@@ -150,10 +153,11 @@ def run_wave_2d_nonlinear(data_dir):
     ]
     n_workers = min(cfg.ntest, max(1, cpu_count() - 1))
     if n_workers <= 1:
-        results = [_wave2d_nonlinear_single_run(c) for c in run_configs]
+        results = [_wave2d_nonlinear_single_run(c) for c in tqdm(run_configs, desc="wave_2d_nonlinear runs")]
     else:
         with Pool(n_workers) as pool:
-            results = pool.map(_wave2d_nonlinear_single_run, run_configs)
+            results = list(tqdm(pool.imap_unordered(_wave2d_nonlinear_single_run, run_configs),
+                                total=cfg.ntest, desc="wave_2d_nonlinear runs"))
 
     t_hist, U_hist = results[0]
     nx_, ny_, _, nt = U_hist.shape
