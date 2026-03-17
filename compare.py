@@ -230,7 +230,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
 
 
 def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
-    from pde.wave_2d_nonlinear import setup_wave2d_nonlinear, advance_tscreen
+    from pde.wave_2d_nonlinear import setup_wave2d_nonlinear
     import config.wave_2d_nonlinear_config as cfg
     from ml.models import CNN
     from ml.snapshot import load_checkpoint
@@ -250,11 +250,12 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
         load_checkpoint(model, model_path)
         model.eval()
 
-    h, qx, qy, rhs, dt, xx, yy = setup_wave2d_nonlinear(
+    h, qx, qy, rhs, advance_fn, dt, xx, yy = setup_wave2d_nonlinear(
         cfg.Lx, cfg.Ly, cfg.nx, cfg.ny,
         g=cfg.g, h0=cfg.h0, f_coriolis=cfg.f_coriolis, nu_h=cfg.nu_h, nu_q=cfg.nu_q,
         nudging_coeff=cfg.nudging_coeff,
         initial_condition=cfg.compare_ic, rng_seed=cfg.compare_seed,
+        integrator=cfg.integrator,
     )
 
     steps_per_nn = cfg.TSCREEN * cfg.njp
@@ -281,7 +282,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     # warm up spectral solver to T=warmup_T
     warmup_steps = int(round(cfg.warmup_T / (cfg.TSCREEN * dt)))
     for _ in range(warmup_steps):
-        h, qx, qy = advance_tscreen(h, qx, qy, rhs, dt, cfg.TSCREEN)
+        h, qx, qy = advance_fn(h, qx, qy, dt, cfg.TSCREEN)
 
     initial_frame = np.stack([h - cfg.h0, qx, qy], axis=-1)
     U_nn = initial_frame.copy()
@@ -292,7 +293,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     spec_elapsed = nn_elapsed = 0.0
     for _ in tqdm(range(n_nn_steps), desc="wave_2d_nonlinear rollout"):
         t0 = time.perf_counter()
-        h, qx, qy = advance_tscreen(h, qx, qy, rhs, dt, steps_per_nn)
+        h, qx, qy = advance_fn(h, qx, qy, dt, steps_per_nn)
         spec_elapsed += time.perf_counter() - t0
         spec_frames.append(np.stack([h - cfg.h0, qx, qy], axis=-1))
         spec_time_list.append(spec_elapsed)

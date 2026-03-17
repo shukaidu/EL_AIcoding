@@ -12,10 +12,13 @@ dy = Ly / ny
 f_coriolis = 0.0
 nudging_coeff = 1.0  # h nudging toward h0 (0 = disabled)
 
+# Time integrator: "imex" (Strang splitting, implicit gravity waves) or "rk4" (explicit)
+integrator = "imex"
+
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
 TF = 10.0
-TSCREEN = 20
-dt_internal = 0.5 * min(dx, dy) / c   # must match pde/wave_2d_nonlinear.py
+TSCREEN = 4
+dt_internal = 5 * 0.5 * min(dx, dy) / c   # rk4: CFL limit; imex: can use larger dt
 nu_h = 0.0
 nu_q = 1e-3 * (min(dx, dy) ** 2) / dt_internal
 dt_samp = TSCREEN * dt_internal        # time between saved frames

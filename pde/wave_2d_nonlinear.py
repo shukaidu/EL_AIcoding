@@ -1,5 +1,5 @@
 """
-2D rotating shallow water on periodic domain (Fourier pseudo-spectral + RK4).
+2D rotating shallow water on periodic domain (Fourier pseudo-spectral + IMEX-RK2).
 State: U = (h, qx=hu, qy=hv). Python port of wave2d_spectral.m.
 """
 import time as _time
@@ -51,12 +51,16 @@ def advance_tscreen(h, qx, qy, rhs, dt, TSCREEN):
     return h, qx, qy
 
 
-def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff=0.0, initial_condition, rng_seed):
-    """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, dt, xx, yy)。"""
+def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff=0.0, initial_condition, rng_seed, integrator="imex", dt=None):
+    """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, advance_fn, dt, xx, yy)。
+    integrator: "imex"（Strang splitting）或 "rk4"（纯显式）。
+    dt: 时间步长，默认为重力波 CFL 步长 0.5*min(dx,dy)/c。"""
     rng = np.random.default_rng(rng_seed)
     c = np.sqrt(g * h0)
+    c2 = g * h0            # c² = g·h0，用于 resolvent
     dx, dy = Lx / nx, Ly / ny
-    dt = 0.5 * min(dx, dy) / c
+    if dt is None:
+        dt = 0.5 * min(dx, dy) / c
 
     xgrid = np.linspace(dx / 2, Lx - dx / 2, nx)
     ygrid = np.linspace(dy / 2, Ly - dy / 2, ny)
@@ -68,6 +72,7 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
     ikx = 1j * KX
     iky = 1j * KY
     Lap = -(KX**2 + KY**2)
+    K2 = KX**2 + KY**2    # 标量波数平方，用于 resolvent
     kx_cut = (2 / 3) * np.max(np.abs(kx_vec))
     ky_cut = (2 / 3) * np.max(np.abs(ky_vec))
     dealias = (np.abs(KX) <= kx_cut) & (np.abs(KY) <= ky_cut)
@@ -109,7 +114,79 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
             dqydt = dqydt + nu_q * LAP(qy)
         return dhdt, dqxdt, dqydt
 
-    return h, qx, qy, rhs, dt, xx, yy
+    def rhs_nonlinear(h, qx, qy):
+        """显式 N 部分：非线性对流 + Coriolis + diffusion（线性重力波项归 L）。"""
+        h_safe = np.maximum(h, 1e-10)
+        u = qx / h_safe
+        v = qy / h_safe
+
+        # dhdt：N 部分只含 nudging + diffusion（连续方程 -∇·q 归 L）
+        dhdt = 0.0
+        if nudging_coeff != 0.0:
+            dhdt = dhdt - nudging_coeff * (h - h0)
+        if nu_h != 0:
+            dhdt = dhdt + nu_h * LAP(h)
+
+        # 动量 N 部分：非线性对流 + 非线性压力修正 + Coriolis + diffusion
+        # Fxx_nl = qx*u + 0.5*g*(h²-2·h0·h)：线性压力部分 g·h0·h 已在 L 中
+        Fxx_nl = qx * u + 0.5 * g * (h**2 - 2 * h0 * h)
+        Fxy_nl = qx * v
+        Gyx_nl = qy * u
+        Gyy_nl = qy * v + 0.5 * g * (h**2 - 2 * h0 * h)
+        dqxdt = -Dx_lin(filter_nl(Fxx_nl)) - Dy_lin(filter_nl(Fxy_nl)) - f_coriolis * h * v
+        dqydt = -Dx_lin(filter_nl(Gyx_nl)) - Dy_lin(filter_nl(Gyy_nl)) + f_coriolis * h * u
+        if nu_q != 0:
+            dqxdt = dqxdt + nu_q * LAP(qx)
+            dqydt = dqydt + nu_q * LAP(qy)
+        return dhdt, dqxdt, dqydt
+
+    def _apply_resolvent(bh, bqx, bqy, alpha):
+        """解析求解 (I - α·A)·X = B（谱空间 Cramer 法则）。"""
+        Bh  = np.fft.fft2(bh)
+        Bqx = np.fft.fft2(bqx)
+        Bqy = np.fft.fft2(bqy)
+        denom = 1.0 + alpha**2 * c2 * K2   # k=0 处 denom=1，自动正确
+        Xh  = (Bh - alpha * ikx * Bqx - alpha * iky * Bqy) / denom
+        Xqx = Bqx - alpha * c2 * ikx * Xh
+        Xqy = Bqy - alpha * c2 * iky * Xh
+        return ifft2r(Xh), ifft2r(Xqx), ifft2r(Xqy)
+
+    def _apply_L_forward(h, qx, qy, beta):
+        """计算 (I + β·A)·[h,qx,qy]（Stage 2 RHS 需要）。"""
+        Fh  = np.fft.fft2(h)
+        Fqx = np.fft.fft2(qx)
+        Fqy = np.fft.fft2(qy)
+        Oh  = Fh  - beta * ikx * Fqx - beta * iky * Fqy
+        Oqx = Fqx - beta * c2 * ikx * Fh
+        Oqy = Fqy - beta * c2 * iky * Fh
+        return ifft2r(Oh), ifft2r(Oqx), ifft2r(Oqy)
+
+    def _advance_imex_strang(h, qx, qy, dt, TSCREEN):
+        """Strang splitting: L(dt/2) -> RK4-N(dt) -> L(dt/2)，全局2阶、虚轴稳定。"""
+        beta = 0.5 * dt
+        for _ in range(TSCREEN):
+            # 半步隐式（重力波）
+            h, qx, qy = _apply_resolvent(h, qx, qy, alpha=beta)
+            # 全步显式（非线性，RK4，稳定域覆盖虚轴）
+            k1h, k1qx, k1qy = rhs_nonlinear(h, qx, qy)
+            k2h, k2qx, k2qy = rhs_nonlinear(
+                h  + 0.5*dt*k1h,  qx + 0.5*dt*k1qx, qy + 0.5*dt*k1qy)
+            k3h, k3qx, k3qy = rhs_nonlinear(
+                h  + 0.5*dt*k2h,  qx + 0.5*dt*k2qx, qy + 0.5*dt*k2qy)
+            k4h, k4qx, k4qy = rhs_nonlinear(
+                h  + dt*k3h,      qx + dt*k3qx,      qy + dt*k3qy)
+            h  = h  + (dt/6)*(k1h  + 2*k2h  + 2*k3h  + k4h)
+            qx = qx + (dt/6)*(k1qx + 2*k2qx + 2*k3qx + k4qx)
+            qy = qy + (dt/6)*(k1qy + 2*k2qy + 2*k3qy + k4qy)
+            # 半步隐式（重力波）
+            h, qx, qy = _apply_resolvent(h, qx, qy, alpha=beta)
+        return h, qx, qy
+
+    if integrator == "rk4":
+        advance_fn = lambda h, qx, qy, dt, TSCREEN: advance_tscreen(h, qx, qy, rhs, dt, TSCREEN)
+    else:
+        advance_fn = _advance_imex_strang
+    return h, qx, qy, rhs, advance_fn, dt, xx, yy
 
 
 def wave2d_spectral(
@@ -128,6 +205,8 @@ def wave2d_spectral(
     nudging_coeff=0.0,
     initial_condition,
     rng_seed,
+    integrator="imex",
+    dt=None,
     verbose=False,
 ):
     """
@@ -135,11 +214,12 @@ def wave2d_spectral(
     Returns: t_history, U_history (nx, ny, 3, n_frames), xx, yy, initial_condition, g, h0, c
     U_history[:,:,0,:] = h - h0, [:,:,1,:] = qx, [:,:,2,:] = qy
     """
-    h, qx, qy, rhs, dt, xx, yy = setup_wave2d_nonlinear(
+    h, qx, qy, rhs, advance_fn, dt, xx, yy = setup_wave2d_nonlinear(
         Lx, Ly, nx, ny,
         g=g, h0=h0, f_coriolis=f_coriolis, nu_h=nu_h, nu_q=nu_q,
         nudging_coeff=nudging_coeff,
         initial_condition=initial_condition, rng_seed=rng_seed,
+        integrator=integrator, dt=dt,
     )
 
     n_frames = (int(np.ceil(TF / dt)) // TSCREEN) + 1
@@ -154,7 +234,7 @@ def wave2d_spectral(
     t = 0.0
     _t0 = _time.perf_counter()
     for frame in range(1, n_frames):
-        h, qx, qy = advance_tscreen(h, qx, qy, rhs, dt, TSCREEN)
+        h, qx, qy = advance_fn(h, qx, qy, dt, TSCREEN)
         t += dt * TSCREEN
         U_history[:, :, 0, frame] = h - h0
         U_history[:, :, 1, frame] = qx

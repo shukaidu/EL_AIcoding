@@ -89,12 +89,14 @@ if run_nonlinear:
     from pde.wave_2d_nonlinear import wave2d_spectral
     import config.wave_2d_nonlinear_config as ncfg
 
+    print(f"[nonlinear] integrator={ncfg.integrator}  dt={ncfg.dt_internal:.5f}  TSCREEN={ncfg.TSCREEN}")
     t_hist, U_hist, xx, yy, _, _, _, _ = wave2d_spectral(
         ncfg.Lx, ncfg.Ly, ncfg.nx, ncfg.ny, TF=10.0, TSCREEN=ncfg.TSCREEN,
         g=ncfg.g, h0=ncfg.h0, f_coriolis=ncfg.f_coriolis, nu_h=ncfg.nu_h, nu_q=ncfg.nu_q,
         nudging_coeff=ncfg.nudging_coeff,
-        initial_condition="random", rng_seed=42, verbose=True,
+        initial_condition="random", rng_seed=42,
+        integrator=ncfg.integrator, dt=ncfg.dt_internal, verbose=True,
     )
     print(f"[nonlinear] n_frames={U_hist.shape[3]}, t_end={t_hist[-1]:.4f}")
     save_gif_multi(U_hist, t_hist, ncfg.Lx, ncfg.Ly,
-                   ["h-h0", "qx", "qy"], "test_wave2d_nonlinear.gif")
+                   ["h-h0", "qx", "qy"], f"test_wave2d_nonlinear_{ncfg.integrator}.gif")
