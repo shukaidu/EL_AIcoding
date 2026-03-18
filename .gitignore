@@ -10,6 +10,9 @@ env/
 *.mat
 *.pth
 
+# Test outputs
+*.gif
+
 # Generated outputs (regenerate with pipeline)
 data/*/training_history.png
 data/*/compare/
