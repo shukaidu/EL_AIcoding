@@ -38,6 +38,7 @@ lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 compare_TF = 1.0
 compare_ic = "ring"
 compare_seed = 42
+sample_seed = 123
 compare_n_times = 6
 
 # Data file names (under data/wave_2d_linear/)

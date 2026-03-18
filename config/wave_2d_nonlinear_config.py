@@ -16,9 +16,9 @@ nudging_coeff = 1.0  # h nudging toward h0 (0 = disabled)
 integrator = "imex"
 
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
-TF = 10.0
-TSCREEN = 4
-dt_internal = 5 * 0.5 * min(dx, dy) / c   # rk4: CFL limit; imex: can use larger dt
+TF = 6.0
+dt_internal = 0.5 * min(dx, dy) / c if integrator == "rk4" else 0.5 * min(dx, dy)
+TSCREEN = round(10 * c) if integrator == "rk4" else 10  # dt_samp ≈ 10 * 0.5*min(dx,dy)
 nu_h = 0.0
 nu_q = 1e-3 * (min(dx, dy) ** 2) / dt_internal
 dt_samp = TSCREEN * dt_internal        # time between saved frames
@@ -54,6 +54,7 @@ warmup_T = 6.0   # frames before this time are excluded from training
 compare_TF = 3.0
 compare_ic = "random"
 compare_seed = 42
+sample_seed = 123
 compare_n_times = 8
 
 # Data file names (under data/wave_2d_nonlinear/)

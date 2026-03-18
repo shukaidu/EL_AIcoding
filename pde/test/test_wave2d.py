@@ -79,8 +79,8 @@ if run_linear:
     import config.wave_2d_linear_config as lcfg
 
     t_hist, u_hist, _, xx, yy, _ = wave2d_main(
-        lcfg.NX, lcfg.NY, lcfg.Lx, lcfg.Ly, lcfg.dt, TF=10.0, TSCREEN=lcfg.TSCREEN,
-        c=lcfg.c, initial_condition="ring", rng_seed=42, verbose=True,
+        lcfg.NX, lcfg.NY, lcfg.Lx, lcfg.Ly, lcfg.dt, TF=lcfg.TF, TSCREEN=lcfg.TSCREEN,
+        c=lcfg.c, initial_condition=lcfg.compare_ic, rng_seed=lcfg.compare_seed, verbose=True,
     )
     print(f"[linear] n_frames={u_hist.shape[2]}, t_end={t_hist[-1]:.4f}")
     save_gif(u_hist, t_hist, lcfg.Lx, lcfg.Ly, "test_wave2d_linear.gif")
@@ -91,10 +91,10 @@ if run_nonlinear:
 
     print(f"[nonlinear] integrator={ncfg.integrator}  dt={ncfg.dt_internal:.5f}  TSCREEN={ncfg.TSCREEN}")
     t_hist, U_hist, xx, yy, _, _, _, _ = wave2d_spectral(
-        ncfg.Lx, ncfg.Ly, ncfg.nx, ncfg.ny, TF=10.0, TSCREEN=ncfg.TSCREEN,
+        ncfg.Lx, ncfg.Ly, ncfg.nx, ncfg.ny, TF=ncfg.TF, TSCREEN=ncfg.TSCREEN,
         g=ncfg.g, h0=ncfg.h0, f_coriolis=ncfg.f_coriolis, nu_h=ncfg.nu_h, nu_q=ncfg.nu_q,
         nudging_coeff=ncfg.nudging_coeff,
-        initial_condition="random", rng_seed=42,
+        initial_condition=ncfg.compare_ic, rng_seed=ncfg.compare_seed,
         integrator=ncfg.integrator, dt=ncfg.dt_internal, verbose=True,
     )
     print(f"[nonlinear] n_frames={U_hist.shape[3]}, t_end={t_hist[-1]:.4f}")

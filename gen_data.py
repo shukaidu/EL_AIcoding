@@ -100,7 +100,7 @@ def run_wave_2d_linear(data_dir):
     output_arr_v = np.zeros((cfg.nwd, cfg.nwd, cfg.nsamp), dtype=np.float32)
     cnt = 0
     n_per_run = cfg.nsamp // cfg.ntest
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(cfg.sample_seed)
     for run_idx, (u_hist, v_hist) in enumerate(results):
         n_frames = u_hist.shape[2]
         for _ in range(n_per_run):
@@ -169,7 +169,7 @@ def run_wave_2d_nonlinear(data_dir):
     for ii, (_, U_hist) in enumerate(results):
         U_historys[:, :, :, :, ii] = U_hist
 
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(cfg.sample_seed)
     input_tensor = np.zeros((cfg.nsamp, 3, patch_side, patch_side), dtype=np.float32)
     output_tensor = np.zeros((cfg.nsamp, 3, cfg.nwd, cfg.nwd), dtype=np.float32)
     n_per_run = cfg.nsamp // cfg.ntest

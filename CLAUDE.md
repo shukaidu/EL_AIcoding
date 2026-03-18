@@ -43,5 +43,9 @@
 ## Bash 命令规范
 - 不要在 `cp`、`ls` 等命令末尾追加无意义确认输出
 
+## Config 规则
+- 所有参数必须从 `config/` 读取，不允许在脚本里写死（hardcode）数值。
+- 如果某个参数 config 里没有，先加到 config，再在脚本里引用。
+
 ## Git
 - 不要主动 commit，只有用户明确要求时才执行 `git commit`

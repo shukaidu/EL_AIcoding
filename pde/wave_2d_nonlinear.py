@@ -38,18 +38,6 @@ def _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, 
     return h, h * u, h * v
 
 
-def advance_tscreen(h, qx, qy, rhs, dt, TSCREEN):
-    """Advance TSCREEN RK4 steps in physical space. Returns (h, qx, qy)."""
-    for _ in range(TSCREEN):
-        k1h, k1qx, k1qy = rhs(h, qx, qy)
-        k2h, k2qx, k2qy = rhs(h + 0.5 * dt * k1h, qx + 0.5 * dt * k1qx, qy + 0.5 * dt * k1qy)
-        k3h, k3qx, k3qy = rhs(h + 0.5 * dt * k2h, qx + 0.5 * dt * k2qx, qy + 0.5 * dt * k2qy)
-        k4h, k4qx, k4qy = rhs(h + dt * k3h, qx + dt * k3qx, qy + dt * k3qy)
-        h  = h  + (dt / 6) * (k1h  + 2 * k2h  + 2 * k3h  + k4h)
-        qx = qx + (dt / 6) * (k1qx + 2 * k2qx + 2 * k3qx + k4qx)
-        qy = qy + (dt / 6) * (k1qy + 2 * k2qy + 2 * k3qy + k4qy)
-    return h, qx, qy
-
 
 def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff=0.0, initial_condition, rng_seed, integrator="imex", dt=None):
     """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, advance_fn, dt, xx, yy)。
@@ -71,8 +59,7 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
     KX, KY = np.meshgrid(kx_vec, ky_vec, indexing="ij")
     ikx = 1j * KX
     iky = 1j * KY
-    Lap = -(KX**2 + KY**2)
-    K2 = KX**2 + KY**2    # 标量波数平方，用于 resolvent
+    K2 = KX**2 + KY**2
     kx_cut = (2 / 3) * np.max(np.abs(kx_vec))
     ky_cut = (2 / 3) * np.max(np.abs(ky_vec))
     dealias = (np.abs(KX) <= kx_cut) & (np.abs(KY) <= ky_cut)
@@ -87,7 +74,7 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
         return ifft2r(iky * np.fft.fft2(f))
 
     def LAP(f):
-        return ifft2r(Lap * np.fft.fft2(f))
+        return ifft2r(-K2 * np.fft.fft2(f))
 
     def filter_nl(f):
         return ifft2r(np.fft.fft2(f) * dealias)
@@ -140,52 +127,58 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
             dqydt = dqydt + nu_q * LAP(qy)
         return dhdt, dqxdt, dqydt
 
-    def _apply_resolvent(bh, bqx, bqy, alpha):
-        """解析求解 (I - α·A)·X = B（谱空间 Cramer 法则）。"""
-        Bh  = np.fft.fft2(bh)
-        Bqx = np.fft.fft2(bqx)
-        Bqy = np.fft.fft2(bqy)
-        denom = 1.0 + alpha**2 * c2 * K2   # k=0 处 denom=1，自动正确
-        Xh  = (Bh - alpha * ikx * Bqx - alpha * iky * Bqy) / denom
-        Xqx = Bqx - alpha * c2 * ikx * Xh
-        Xqy = Bqy - alpha * c2 * iky * Xh
+    def _cn_step(h, qx, qy, dt):
+        """Crank-Nicolson L 步，推进 dt：(I-α·A)^{-1}·(I+α·A)，alpha=dt/2，全在谱空间完成。"""
+        alpha = dt / 2
+        Fh  = np.fft.fft2(filter_nl(h))
+        Fqx = np.fft.fft2(filter_nl(qx))
+        Fqy = np.fft.fft2(filter_nl(qy))
+        # (I + α·A)
+        Oh  = Fh  - alpha * ikx * Fqx - alpha * iky * Fqy
+        Oqx = Fqx - alpha * c2 * ikx * Fh
+        Oqy = Fqy - alpha * c2 * iky * Fh
+        # (I - α·A)^{-1}
+        denom = 1.0 + alpha**2 * c2 * K2
+        Xh  = (Oh - alpha * ikx * Oqx - alpha * iky * Oqy) / denom
+        Xqx = Oqx - alpha * c2 * ikx * Xh
+        Xqy = Oqy - alpha * c2 * iky * Xh
         return ifft2r(Xh), ifft2r(Xqx), ifft2r(Xqy)
 
-    def _apply_L_forward(h, qx, qy, beta):
-        """计算 (I + β·A)·[h,qx,qy]（Stage 2 RHS 需要）。"""
-        Fh  = np.fft.fft2(h)
-        Fqx = np.fft.fft2(qx)
-        Fqy = np.fft.fft2(qy)
-        Oh  = Fh  - beta * ikx * Fqx - beta * iky * Fqy
-        Oqx = Fqx - beta * c2 * ikx * Fh
-        Oqy = Fqy - beta * c2 * iky * Fh
-        return ifft2r(Oh), ifft2r(Oqx), ifft2r(Oqy)
+    def _rk4(h, qx, qy, dt):
+        """RK4 显式推进一步。"""
+        k1h, k1qx, k1qy = rhs_nonlinear(h, qx, qy)
+        k2h, k2qx, k2qy = rhs_nonlinear(
+            h  + 0.5*dt*k1h,  qx + 0.5*dt*k1qx, qy + 0.5*dt*k1qy)
+        k3h, k3qx, k3qy = rhs_nonlinear(
+            h  + 0.5*dt*k2h,  qx + 0.5*dt*k2qx, qy + 0.5*dt*k2qy)
+        k4h, k4qx, k4qy = rhs_nonlinear(
+            h  + dt*k3h,      qx + dt*k3qx,      qy + dt*k3qy)
+        h  = h  + (dt/6)*(k1h  + 2*k2h  + 2*k3h  + k4h)
+        qx = qx + (dt/6)*(k1qx + 2*k2qx + 2*k3qx + k4qx)
+        qy = qy + (dt/6)*(k1qy + 2*k2qy + 2*k3qy + k4qy)
+        return h, qx, qy
 
     def _advance_imex_strang(h, qx, qy, dt, TSCREEN):
-        """Strang splitting: L(dt/2) -> RK4-N(dt) -> L(dt/2)，全局2阶、虚轴稳定。"""
-        beta = 0.5 * dt
+        """Strang splitting: L_CN(dt/2) -> N_RK4(dt) -> L_CN(dt/2)。"""
         for _ in range(TSCREEN):
-            # 半步隐式（重力波）
-            h, qx, qy = _apply_resolvent(h, qx, qy, alpha=beta)
-            # 全步显式（非线性，RK4，稳定域覆盖虚轴）
-            k1h, k1qx, k1qy = rhs_nonlinear(h, qx, qy)
-            k2h, k2qx, k2qy = rhs_nonlinear(
-                h  + 0.5*dt*k1h,  qx + 0.5*dt*k1qx, qy + 0.5*dt*k1qy)
-            k3h, k3qx, k3qy = rhs_nonlinear(
-                h  + 0.5*dt*k2h,  qx + 0.5*dt*k2qx, qy + 0.5*dt*k2qy)
-            k4h, k4qx, k4qy = rhs_nonlinear(
-                h  + dt*k3h,      qx + dt*k3qx,      qy + dt*k3qy)
+            h, qx, qy = _cn_step(h, qx, qy, dt/2)
+            h, qx, qy = _rk4(h, qx, qy, dt)
+            h, qx, qy = _cn_step(h, qx, qy, dt/2)
+        return h, qx, qy
+
+    def _advance_rk4(h, qx, qy, dt, TSCREEN):
+        """RK4 全步推进 TSCREEN 步。"""
+        for _ in range(TSCREEN):
+            k1h, k1qx, k1qy = rhs(h, qx, qy)
+            k2h, k2qx, k2qy = rhs(h + 0.5*dt*k1h, qx + 0.5*dt*k1qx, qy + 0.5*dt*k1qy)
+            k3h, k3qx, k3qy = rhs(h + 0.5*dt*k2h, qx + 0.5*dt*k2qx, qy + 0.5*dt*k2qy)
+            k4h, k4qx, k4qy = rhs(h + dt*k3h, qx + dt*k3qx, qy + dt*k3qy)
             h  = h  + (dt/6)*(k1h  + 2*k2h  + 2*k3h  + k4h)
             qx = qx + (dt/6)*(k1qx + 2*k2qx + 2*k3qx + k4qx)
             qy = qy + (dt/6)*(k1qy + 2*k2qy + 2*k3qy + k4qy)
-            # 半步隐式（重力波）
-            h, qx, qy = _apply_resolvent(h, qx, qy, alpha=beta)
         return h, qx, qy
 
-    if integrator == "rk4":
-        advance_fn = lambda h, qx, qy, dt, TSCREEN: advance_tscreen(h, qx, qy, rhs, dt, TSCREEN)
-    else:
-        advance_fn = _advance_imex_strang
+    advance_fn = _advance_rk4 if integrator == "rk4" else _advance_imex_strang
     return h, qx, qy, rhs, advance_fn, dt, xx, yy
 
 
