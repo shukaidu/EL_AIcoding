@@ -28,9 +28,9 @@ dt_samp = TSCREEN * dt_internal        # time between saved frames
 nwd = 32
 njp = 2
 
-# Patch stencil: halo per side from CFL (wave travels ~c over njp*dt_samp); CNN needs (patch_side - nwd) divisible by 4 and >= 4
+# Patch stencil: halo per side from CFL (wave travels ~c over njp*dt_samp); 2*nst must be divisible by 4 => nst divisible by 2
 _nst_min = round(c * njp * dt_samp / dx)   # ≈ njp*TSCREEN/2 (exact int, round guards float drift)
-nst = 4 * (_nst_min // 4 + 1)
+nst = 2 * (_nst_min // 2 + 1)
 patch_side = nwd + 2 * nst
 
 
@@ -45,6 +45,7 @@ b_size = 100
 num_epochs = 150
 base = 32        # model base channels
 model_type = "unet"   # "cnn" | "unet"
+pooling = "max"       # "max" | "avg" | "stride"
 residual = True       # predict delta (next - current) instead of next state
 lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
 smooth_weight = [0, 1e-1, 1e-1]      # per-channel [h-h0, qx, qy]
@@ -56,7 +57,7 @@ warmup_T = 5.0   # frames before this time are excluded from training
 # Compare (reference vs NN rollout)
 compare_TF = 4.0
 compare_ic = "random"
-compare_seed = 42
+compare_seed = 17
 sample_seed = 123
 compare_n_times = 8
 

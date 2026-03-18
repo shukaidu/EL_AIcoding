@@ -247,7 +247,8 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
         base = ckpt.get("base", 32)
         model_type = ckpt.get("model_type", getattr(cfg, "model_type", "cnn")).lower()
         if model_type == "unet":
-            model = UNet(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
+            pooling = ckpt.get("pooling", getattr(cfg, "pooling", "max"))
+            model = UNet(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd, pooling=pooling).to(device)
         else:
             model = CNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
         load_checkpoint(model, model_path)

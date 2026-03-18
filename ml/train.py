@@ -123,10 +123,12 @@ def main():
         tl, vl, _, C_in, C_out, Nx, Ny, nx, ny, stats = load_wave_2d_nonlinear(path, device, b_size=cfg.b_size, residual=residual)
         model_type = getattr(cfg, "model_type", "cnn").lower()
         if model_type == "unet":
-            model = UNet(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
+            pooling = getattr(cfg, "pooling", "max")
+            model = UNet(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx, pooling=pooling).to(device)
         else:
+            pooling = "max"
             model = CNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
-        _run(model, tl, vl, cfg, data_dir, base=cfg.base, model_type=model_type,
+        _run(model, tl, vl, cfg, data_dir, base=cfg.base, model_type=model_type, pooling=pooling,
              ch_mean=stats["ch_mean"], ch_std=stats["ch_std"], residual=residual)
         return
 

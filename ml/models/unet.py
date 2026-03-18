@@ -12,16 +12,27 @@ def _double_conv(in_ch, out_ch):
     )
 
 
+def _make_pool(pooling, ch):
+    if pooling == "max":
+        return nn.MaxPool2d(2)
+    elif pooling == "avg":
+        return nn.AvgPool2d(2)
+    elif pooling == "stride":
+        return nn.Conv2d(ch, ch, 3, stride=2, padding=1)
+    else:
+        raise ValueError(f"Unknown pooling: {pooling!r}")
+
+
 class UNet(nn.Module):
-    def __init__(self, Cin, Cout, base, Nx, nx):
+    def __init__(self, Cin, Cout, base, Nx, nx, pooling="max"):
         super().__init__()
         self._crop_offset = (Nx - nx) // 2
         self._nx = nx
 
         self.enc0 = _double_conv(Cin, base)
-        self.pool0 = nn.MaxPool2d(2)
+        self.pool0 = _make_pool(pooling, base)
         self.enc1 = _double_conv(base, base * 2)
-        self.pool1 = nn.MaxPool2d(2)
+        self.pool1 = _make_pool(pooling, base * 2)
 
         self.bottleneck = _double_conv(base * 2, base * 4)
 
