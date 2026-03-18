@@ -23,7 +23,11 @@
   - `models/`：模型定义（`cnn.py`、`mlp.py`）
 - `gen_data.py`：数据生成入口
 - `compare.py`：对比入口
+- `sweep.py`：超参搜索（针对 `wave_2d_nonlinear`）
+- `pde/test/`：各问题单元测试（`test_burgers_1d.py`、`test_wave2d_linear.py`、`test_wave2d_nonlinear.py`）及可视化脚本 `vis_pde.py`
 - `data/<问题名>/`：数据、模型、训练曲线、对比图输出
+- `latex/report.tex`：实验报告 LaTeX 源文件
+- `latex/report.pdf`：编译后的 PDF 报告
 - `latex/figures/<问题名>/`：实验图片归档目录
 
 ## Pipeline 规则
@@ -35,6 +39,7 @@
 4. 对比：`python compare.py --problem <问题名>`
 5. 拷图：将 `data/<问题名>/training_history.png` 和 `data/<问题名>/compare/*.png` 拷到 `latex/figures/<问题名>/`
 6. 更新报告：将 `latex/report.tex` 中对应问题的参数表和结果数值更新到最新值
+7. 编译 PDF：`cd latex && tectonic report.tex`
 
 ## 并行与顺序
 - 数据生成三个问题可并行执行

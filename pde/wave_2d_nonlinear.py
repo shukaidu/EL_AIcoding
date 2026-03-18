@@ -39,16 +39,14 @@ def _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, 
 
 
 
-def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff=0.0, initial_condition, rng_seed, integrator="imex", dt=None):
+def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff=0.0, initial_condition, rng_seed, integrator="imex", dt):
     """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, advance_fn, dt, xx, yy)。
     integrator: "imex"（Strang splitting）或 "rk4"（纯显式）。
-    dt: 时间步长，默认为重力波 CFL 步长 0.5*min(dx,dy)/c。"""
+    dt: 时间步长，必须显式传入（从 config.dt_internal 读取）。"""
     rng = np.random.default_rng(rng_seed)
     c = np.sqrt(g * h0)
     c2 = g * h0            # c² = g·h0，用于 resolvent
     dx, dy = Lx / nx, Ly / ny
-    if dt is None:
-        dt = 0.5 * min(dx, dy) / c
 
     xgrid = np.linspace(dx / 2, Lx - dx / 2, nx)
     ygrid = np.linspace(dy / 2, Ly - dy / 2, ny)
@@ -199,7 +197,7 @@ def wave2d_spectral(
     initial_condition,
     rng_seed,
     integrator="imex",
-    dt=None,
+    dt,
     verbose=False,
 ):
     """

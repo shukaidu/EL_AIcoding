@@ -6,7 +6,11 @@ COMMON = dict(Lx=2*np.pi, Ly=2*np.pi, nx=32, ny=32,
               g=9.8, h0=1.0, f_coriolis=0.0, nu_h=0.0, nu_q=0.0,
               nudging_coeff=0.0, initial_condition="random", rng_seed=42)
 
-def make(integrator, dt=None):
+_dx = COMMON["Lx"] / COMMON["nx"]
+_c  = np.sqrt(COMMON["g"] * COMMON["h0"])
+DT_TEST = 0.5 * _dx / _c   # RK4 CFL dt for this test grid
+
+def make(integrator, dt=DT_TEST):
     return setup_wave2d_nonlinear(**COMMON, integrator=integrator, dt=dt)
 
 # ── 1. IMEX vs RK4 一致性（小 dt）────────────────────────────────────────────
@@ -34,7 +38,9 @@ CONV = dict(Lx=2*np.pi, Ly=2*np.pi, nx=32, ny=32,
             g=9.8, h0=1.0, f_coriolis=0.0, nu_h=0.0, nu_q=0.0,
             nudging_coeff=0.0, initial_condition="ring", rng_seed=1)
 
-_, _, _, _, _, dt_base, _, _ = setup_wave2d_nonlinear(**CONV, integrator="imex")
+_dx_conv = CONV["Lx"] / CONV["nx"]
+_c_conv  = np.sqrt(CONV["g"] * CONV["h0"])
+dt_base  = 0.5 * _dx_conv / _c_conv
 T = 5 * dt_base  # 短时间，保证在渐近区
 
 def run_conv(n_steps):
