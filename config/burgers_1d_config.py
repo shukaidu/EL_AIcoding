@@ -12,10 +12,13 @@ dx = L / nx
 t_end = 4.0
 dt = CFL * dx / umax
 nt = int(round(t_end / dt))
-# NN prediction window
-njp = 100
-nst = int(np.floor(njp * CFL)) + 1
+# Frames: save every TSCREEN solver steps
+TSCREEN = 50
+dt_samp = TSCREEN * dt
+# NN prediction window: one NN step = njp saved frames
+njp = 2
 nwd = 100
+nst = int(np.floor(njp * dt_samp / dx)) + 1
 # Initial condition
 alpha = 2.5
 u_mean = 0.0

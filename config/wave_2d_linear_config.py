@@ -35,7 +35,7 @@ activation = "linear"  # relu|tanh|gelu|linear
 lr_schedule = [(1000, 1e-3), (2000, 1e-4), (2500, 1e-5)]
 
 # Compare (reference vs NN rollout)
-compare_TF = 1.0
+compare_TF = 2.0
 compare_ic = "ring"
 compare_seed = 42
 sample_seed = 123

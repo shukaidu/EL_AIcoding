@@ -1,9 +1,10 @@
-"""Test wave2d_main (linear) and wave2d_spectral (nonlinear), save gifs to pde/test/.
+"""可视化所有 PDE 求解器，保存 GIF 到 pde/test/。
 
 Usage:
-  python pde/test/test_wave2d.py             # both
-  python pde/test/test_wave2d.py linear      # linear only
-  python pde/test/test_wave2d.py nonlinear   # nonlinear only
+  python pde/test/vis_pde.py                  # all
+  python pde/test/vis_pde.py burgers          # burgers_1d only
+  python pde/test/vis_pde.py linear           # wave_2d_linear only
+  python pde/test/vis_pde.py nonlinear        # wave_2d_nonlinear only
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,8 +14,30 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 HERE = os.path.dirname(__file__)
 args = sys.argv[1:]
+run_burgers   = not args or "burgers"   in args
 run_linear    = not args or "linear"    in args
 run_nonlinear = not args or "nonlinear" in args
+
+
+def save_gif_1d(u_history, t_history, xc, name):
+    """Save GIF for 1D field: u_history shape (nx, n_frames)."""
+    fig, ax = plt.subplots(figsize=(7, 4))
+    line, = ax.plot(xc, u_history[:, 0])
+    ax.set_xlim(xc[0], xc[-1])
+    ymax = np.max(np.abs(u_history)) or 1.0
+    ax.set_ylim(-ymax * 1.1, ymax * 1.1)
+    title = ax.set_title(f"t = {t_history[0]:.3f}")
+
+    def update(frame):
+        line.set_ydata(u_history[:, frame])
+        title.set_text(f"t = {t_history[frame]:.3f}")
+        return line, title
+
+    ani = animation.FuncAnimation(fig, update, frames=u_history.shape[1], interval=50, blit=True)
+    out = os.path.join(HERE, name)
+    ani.save(out, writer="pillow", fps=20)
+    plt.close()
+    print(f"Saved: {out}")
 
 
 def save_gif_multi(U_history, t_history, Lx, Ly, var_names, name):
@@ -73,6 +96,18 @@ def save_gif(u_history, t_history, Lx, Ly, name):
     plt.close()
     print(f"Saved: {out}")
 
+
+if run_burgers:
+    from pde.burgers_1d import burgers_1d_main
+    import config.burgers_1d_config as bcfg
+
+    print(f"[burgers] nx={bcfg.nx}  dt={bcfg.dt:.5f}  TF={bcfg.compare_t_end}")
+    t_history, u_history, xc = burgers_1d_main(
+        bcfg.nx, bcfg.dx, bcfg.dt, bcfg.L, bcfg.nu, bcfg.alpha, bcfg.u_mean,
+        TF=bcfg.compare_t_end, TSCREEN=bcfg.TSCREEN, rng_seed=bcfg.compare_seed, verbose=True,
+    )
+    print(f"[burgers] n_frames={u_history.shape[1]}  t_end={t_history[-1]:.4f}")
+    save_gif_1d(u_history, t_history, xc, "vis_burgers_1d.gif")
 
 if run_linear:
     from pde.wave_2d_linear import wave2d_main

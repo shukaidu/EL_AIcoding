@@ -16,7 +16,7 @@ nudging_coeff = 1.0  # h nudging toward h0 (0 = disabled)
 integrator = "imex"
 
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
-TF = 6.0
+TF = 10.0
 dt_internal = 0.5 * min(dx, dy) / c if integrator == "rk4" else 0.5 * min(dx, dy)
 TSCREEN = round(10 * c) if integrator == "rk4" else 10  # dt_samp ≈ 10 * 0.5*min(dx,dy)
 nu_h = 0.0
@@ -48,10 +48,10 @@ smooth_weight = [1e-2, 0.0, 0.0]      # per-channel [h-h0, qx, qy]
 smooth_mode = "absolute"   # "absolute" | "relative"
 param_ratio   = [10.0, 1.0, 1.0]     # h 通道数据损失×10
 
-warmup_T = 6.0   # frames before this time are excluded from training
+warmup_T = 4.0   # frames before this time are excluded from training
 
 # Compare (reference vs NN rollout)
-compare_TF = 3.0
+compare_TF = 4.0
 compare_ic = "random"
 compare_seed = 42
 sample_seed = 123

@@ -37,7 +37,7 @@ def _compare_burgers_1d(data_dir, out_dir):
     nx, dx, dt = cfg.nx, cfg.dx, cfg.dt
     njp, nst, nwd = cfg.njp, cfg.nst, cfg.nwd
     alpha, u_mean, nu = cfg.alpha, cfg.u_mean, cfg.nu
-    dt_nn = njp * dt
+    dt_nn = njp * cfg.TSCREEN * dt   # one NN step = njp saved frames, each frame = TSCREEN solver steps
     n_nn_steps = int(round(cfg.compare_t_end / dt_nn))
 
     u0, xc, A = setup_burger(nx, dx, dt, L, nu, alpha, u_mean, cfg.compare_seed)
@@ -78,7 +78,7 @@ def _compare_burgers_1d(data_dir, out_dir):
     fv_elapsed = nn_elapsed = 0.0
     for _ in tqdm(range(n_nn_steps), desc="burgers_1d rollout"):
         t0 = time.perf_counter()
-        for _ in range(njp):
+        for _ in range(njp * cfg.TSCREEN):
             u_fv = integrate_burger(u_fv, dt, dx, nu, A=A)
         fv_elapsed += time.perf_counter() - t0
         fv_list.append(u_fv.copy())
@@ -197,12 +197,10 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     comp_names = ["u", "v"]
     clims = []
     for c_idx in range(2):
-        lo = min(np.array(spec_list if c_idx == 0 else spec_v_list).min(),
-                 np.array(nn_frames_u if c_idx == 0 else nn_frames_v).min())
-        hi = max(np.array(spec_list if c_idx == 0 else spec_v_list).max(),
-                 np.array(nn_frames_u if c_idx == 0 else nn_frames_v).max())
-        pad = 0.05 * (hi - lo or 1)
-        clims.append((lo - pad, hi + pad))
+        all_frames = spec_list if c_idx == 0 else spec_v_list
+        vmax = max(np.abs(f).max() for f in all_frames)
+        vmax = max(vmax, 1e-6)
+        clims.append((-vmax, vmax))
 
     os.makedirs(out_dir, exist_ok=True)
     dt_nn = steps_per_nn * cfg.dt
@@ -213,9 +211,9 @@ def _compare_wave_2d_linear(data_dir, out_dir):
         for c_idx in range(2):
             spec_f = spec_list[i] if c_idx == 0 else spec_v_list[i]
             nn_f = nn_frames_u[i] if c_idx == 0 else nn_frames_v[i]
-            pc0 = axes[0, c_idx].pcolormesh(xx, yy, spec_f.T, shading="auto")
+            pc0 = axes[0, c_idx].pcolormesh(xx, yy, spec_f.T, shading="auto", cmap="RdBu_r")
             axes[0, c_idx].set_title(f"Spectral {comp_names[c_idx]}")
-            pc1 = axes[1, c_idx].pcolormesh(xx, yy, nn_f.T, shading="auto")
+            pc1 = axes[1, c_idx].pcolormesh(xx, yy, nn_f.T, shading="auto", cmap="RdBu_r")
             axes[1, c_idx].set_title(f"NN {comp_names[c_idx]}")
             pc0.set_clim(clims[c_idx])
             pc1.set_clim(clims[c_idx])
@@ -310,12 +308,9 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     comp_names = ["h - h0", "qx", "qy"]
     clims = []
     for c in range(3):
-        lo = min(np.array([f[:, :, c].min() for f in spec_frames]).min(),
-                 np.array([f[:, :, c].min() for f in nn_frames]).min())
-        hi = max(np.array([f[:, :, c].max() for f in spec_frames]).max(),
-                 np.array([f[:, :, c].max() for f in nn_frames]).max())
-        pad = 0.05 * (hi - lo or 1)
-        clims.append((lo - pad, hi + pad))
+        vmax = max(np.abs(f[:, :, c]).max() for f in spec_frames)
+        vmax = max(vmax, 1e-6)
+        clims.append((-vmax, vmax))
 
     os.makedirs(out_dir, exist_ok=True)
     dt_nn = steps_per_nn * dt
@@ -324,9 +319,9 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
         t_val = i * dt_nn
         fig, axes = plt.subplots(2, 3, figsize=(12, 8), constrained_layout=True)
         for c in range(3):
-            pc0 = axes[0, c].pcolormesh(xx, yy, spec_frames[i][:, :, c].T, shading="auto")
+            pc0 = axes[0, c].pcolormesh(xx, yy, spec_frames[i][:, :, c].T, shading="auto", cmap="RdBu_r")
             axes[0, c].set_title(f"Spectral {comp_names[c]}")
-            pc1 = axes[1, c].pcolormesh(xx, yy, nn_frames[i][:, :, c].T, shading="auto")
+            pc1 = axes[1, c].pcolormesh(xx, yy, nn_frames[i][:, :, c].T, shading="auto", cmap="RdBu_r")
             axes[1, c].set_title(f"NN {comp_names[c]}")
             pc0.set_clim(clims[c])
             pc1.set_clim(clims[c])

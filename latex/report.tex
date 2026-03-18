@@ -98,14 +98,14 @@ The goal is to learn a local map on a small spatial element or patch from data p
     $g$, $h_0$ & 9.8, 1.0 \\
     Time integrator & IMEX (Strang splitting) \\
     Time step $\Delta t$ & $0.5\min(\Delta x,\Delta y)$ \\
-    Steps per saved frame $T_{\mathrm{screen}}$ & 4 \\
-    Patch half-width $n_{\mathrm{st}}$ & 16 \\
+    Steps per saved frame $T_{\mathrm{screen}}$ & 10 \\
+    Patch half-width $n_{\mathrm{st}}$ & 32 \\
     Interior width $n_{\mathrm{wd}}$ & 32 \\
     Viscosity $\nu_h$ & 0 \\
     Nudging coefficient & 1.0 \\
     Batch size & 100 \\
-    Warmup time & 6.0 \\
-    Compare $T_F$ & 3.0 \\
+    Warmup time & 4.0 \\
+    Compare $T_F$ & 4.0 \\
     Compare frames & 8 \\
     Compare IC & random \\
     Training samples & 5000 \\
@@ -144,7 +144,7 @@ Figure~\ref{fig:training} shows the train and test loss versus epoch for the thr
 \end{figure}
 
 \subsection{1D Burgers: FV vs. NN}
-Comparison at 6 output times over $t\in[0,2]$ with \texttt{compare\_t\_end=2.0}. Runtime for this run: FV total $4.166$\,s, NN total $0.3310$\,s, speedup $12.59\times$.
+Comparison at 6 output times over $t\in[0,2]$ with \texttt{compare\_t\_end=2.0}. Runtime for this run: FV total $4.081$\,s, NN total $0.3124$\,s, speedup $13.1\times$.
 
 \begin{figure}[H]
   \centering
@@ -163,7 +163,7 @@ Comparison at 6 output times over $t\in[0,2]$ with \texttt{compare\_t\_end=2.0}.
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs. NN}
-Comparison at 6 aligned frames with \texttt{compare\_TF=1.0} and \texttt{compare\_ic=ring}. Runtime for this run: spectral $3.620$\,s, NN $0.0975$\,s, speedup $37.13\times$.
+Comparison at 6 aligned frames with \texttt{compare\_TF=2.0} and \texttt{compare\_ic=ring}. Runtime for this run: spectral $6.509$\,s, NN $0.1712$\,s, speedup $38.0\times$.
 
 \begin{figure}[H]
   \centering
@@ -182,7 +182,7 @@ Comparison at 6 aligned frames with \texttt{compare\_TF=1.0} and \texttt{compare
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs. NN}
-Comparison at 8 aligned frames for $(h-h_0,q_x,q_y)$ with \texttt{compare\_TF=3.0} and \texttt{compare\_ic=random}. Both rollouts start after warmup time $T=6.0$. Final rollout metrics for this run: mean L1 error $0.026660$, max-frame L1 error $0.052709$, spectral runtime $108.784$\,s, NN runtime $11.1522$\,s, speedup $9.76\times$.
+Comparison at 8 aligned frames for $(h-h_0,q_x,q_y)$ with \texttt{compare\_TF=4.0} and \texttt{compare\_ic=random}. Both rollouts start after warmup time $T=4.0$. Final rollout metrics for this run: mean L1 error $0.019689$, max-frame L1 error $0.035157$, spectral runtime $151.348$\,s, NN runtime $14.2391$\,s, speedup $10.6\times$.
 
 \begin{figure}[H]
   \centering

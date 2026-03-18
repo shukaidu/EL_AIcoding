@@ -90,37 +90,27 @@ def setup_burger(nx, dx, dt, L, nu, alpha, u_mean, rng_seed):
     return u0, xc, A
 
 
-def run_reference_solver():
+def burgers_1d_main(nx, dx, dt, L, nu, alpha, u_mean, TF, TSCREEN, rng_seed, verbose=False):
+    """运行 Burgers 求解器，返回 (t_history, u_history, xc)。
+    u_history shape: (nx, n_frames)，每 TSCREEN 步保存一帧。
     """
-    Run the full FV solver with parameters from config.burgers_1d_config.
-    Returns:
-        xc : cell centers in [0, L]
-        u0 : initial condition
-        u  : final solution after t_end
-    """
-    from config import burgers_1d_config as cfg
-    L = cfg.L
-    nx, dx, dt, nt = cfg.nx, cfg.dx, cfg.dt, cfg.nt
-    alpha, u_mean, nu = cfg.alpha, cfg.u_mean, cfg.nu
-
-    rng = np.random.default_rng(42)
-    xc = np.linspace(0.0, L, nx, endpoint=False) + dx / 2.0
-    u0 = gen_dist_1d(nx, alpha, rng) + u_mean
-
-    u = u0.copy()
-    A = build_diffusion_matrix(nx, dt, dx, nu)
-    _t0 = _time.perf_counter()
-    print_every = max(1, nt // 20)
-    for n in range(nt):
-        u = integrate_burger(u, dt, dx, nu, A=A)
-        if (n + 1) % print_every == 0 or n + 1 == nt:
-            elapsed = _time.perf_counter() - _t0
-            t_phys = (n + 1) * dt
-            eta = elapsed / (n + 1) * (nt - n - 1)
-            print(f"  [burgers_1d] step {n+1:5d}/{nt}  t={t_phys:.4f}  "
-                  f"elapsed={elapsed:.1f}s  ETA={eta:.1f}s  |u|_max={np.max(np.abs(u)):.4f}", flush=True)
-
-    return xc, u0, u
+    u, xc, A = setup_burger(nx, dx, dt, L, nu, alpha, u_mean, rng_seed)
+    n_steps = int(TF / dt)
+    n_frames = n_steps // TSCREEN + 1
+    t_history = np.zeros(n_frames)
+    u_history = np.zeros((nx, n_frames))
+    u_history[:, 0] = u
+    t0 = _time.perf_counter()
+    for frame in range(1, n_frames):
+        for _ in range(TSCREEN):
+            u = integrate_burger(u, dt, dx, nu, A)
+        u_history[:, frame] = u
+        t_history[frame] = frame * TSCREEN * dt
+        if verbose:
+            elapsed = _time.perf_counter() - t0
+            print(f"  [burgers] frame {frame:4d}/{n_frames-1}  t={t_history[frame]:.4f}  "
+                  f"elapsed={elapsed:.1f}s  |u|_max={np.max(np.abs(u)):.4f}", flush=True)
+    return t_history, u_history, xc
 
 
 if __name__ == "__main__":
@@ -130,7 +120,11 @@ if __name__ == "__main__":
     if _root not in sys.path:
         sys.path.insert(0, _root)
     from config import burgers_1d_config as cfg
-    xc, u0, u = run_reference_solver()
-    print(f"nx = {cfg.nx}, nt = {cfg.nt}")
-    print(f"u0 mean = {u0.mean():.6f}, u mean = {u.mean():.6f}")
+    TF = cfg.nt * cfg.dt
+    t_hist, u_hist, xc = burgers_1d_main(
+        cfg.nx, cfg.dx, cfg.dt, cfg.L, cfg.nu, cfg.alpha, cfg.u_mean,
+        TF=TF, TSCREEN=cfg.njp, rng_seed=42, verbose=True,
+    )
+    print(f"nx={cfg.nx}  n_frames={u_hist.shape[1]}  t_end={t_hist[-1]:.4f}")
+    print(f"u0 mean={u_hist[:, 0].mean():.6f}  u_final mean={u_hist[:, -1].mean():.6f}")
 

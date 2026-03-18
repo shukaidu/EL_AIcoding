@@ -15,28 +15,22 @@ def _burgers_1d_single_trajectory(args):
     """Top-level for multiprocessing pickle. args = (seed, per_traj). Returns (inputs_list, outputs_list)."""
     seed, per_traj = args
     import config.burgers_1d_config as cfg
-    from pde.burgers_1d import gen_dist_1d, build_diffusion_matrix, integrate_burger
+    from pde.burgers_1d import burgers_1d_main
 
+    TF = cfg.nt * cfg.dt
+    t_hist, u_history, xc = burgers_1d_main(
+        cfg.nx, cfg.dx, cfg.dt, cfg.L, cfg.nu, cfg.alpha, cfg.u_mean,
+        TF=TF, TSCREEN=cfg.TSCREEN, rng_seed=seed,
+    )
+    # u_history: (nx, n_frames)，相邻帧间距 = TSCREEN 步
+    n_frames = u_history.shape[1]
     rng = np.random.default_rng(seed)
-    nx, nt = cfg.nx, cfg.nt
-    njp, nst, nwd = cfg.njp, cfg.nst, cfg.nwd
-
-    u0 = gen_dist_1d(nx, cfg.alpha, rng) + cfg.u_mean
-    u_history = np.zeros((nx, nt + 1), dtype=float)
-    u_history[:, 0] = u0
-    A = build_diffusion_matrix(nx, cfg.dt, cfg.dx, cfg.nu)
-    u = u0.copy()
-    for n in range(nt):
-        u = integrate_burger(u, cfg.dt, cfg.dx, cfg.nu, A=A)
-        u_history[:, n + 1] = u
-
-    i0_pool = np.random.randint(0, nx - 2 * nst - nwd + 1, size=per_traj)
-    j0_pool = np.random.randint(0, nt - njp + 1, size=per_traj)
     inputs_list, outputs_list = [], []
-    for k in range(per_traj):
-        i0, j0 = i0_pool[k], j0_pool[k]
-        inputs_list.append(u_history[i0 : i0 + 2 * nst + nwd, j0])
-        outputs_list.append(u_history[i0 + nst : i0 + nst + nwd, j0 + njp])
+    for _ in range(per_traj):
+        i0 = rng.integers(0, cfg.nx - 2 * cfg.nst - cfg.nwd + 1)
+        j0 = rng.integers(0, n_frames - cfg.njp)
+        inputs_list.append(u_history[i0 : i0 + 2 * cfg.nst + cfg.nwd, j0])
+        outputs_list.append(u_history[i0 + cfg.nst : i0 + cfg.nst + cfg.nwd, j0 + cfg.njp])
     return inputs_list, outputs_list
 
 
