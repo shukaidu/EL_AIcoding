@@ -15,5 +15,5 @@ def save_checkpoint(model, optimizer, epoch, hist_tr, hist_te, path, **extra):
 
 
 def load_checkpoint(model, path):
-    ckpt = torch.load(path, map_location="cpu")
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])

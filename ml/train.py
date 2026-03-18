@@ -11,7 +11,7 @@ _repo_root = os.path.dirname(_ml_dir)
 sys.path.insert(0, _repo_root)
 
 from ml.data_io import load_mat, load_wave_2d_nonlinear
-from ml.models import MLP, CNN
+from ml.models import MLP, CNN, UNet
 from ml.train_loop import get_device, plot_training_history
 from ml.snapshot import save_checkpoint
 
@@ -119,9 +119,15 @@ def main():
         if not os.path.isfile(path):
             print(f"Data not found: {path}. Run: python gen_data.py --problem wave_2d_nonlinear")
             return
-        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny = load_wave_2d_nonlinear(path, device, b_size=cfg.b_size)
-        model = CNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
-        _run(model, tl, vl, cfg, data_dir, base=cfg.base)
+        residual = getattr(cfg, "residual", False)
+        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny, stats = load_wave_2d_nonlinear(path, device, b_size=cfg.b_size, residual=residual)
+        model_type = getattr(cfg, "model_type", "cnn").lower()
+        if model_type == "unet":
+            model = UNet(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
+        else:
+            model = CNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
+        _run(model, tl, vl, cfg, data_dir, base=cfg.base, model_type=model_type,
+             ch_mean=stats["ch_mean"], ch_std=stats["ch_std"], residual=residual)
         return
 
 

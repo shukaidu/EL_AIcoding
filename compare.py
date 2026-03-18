@@ -230,7 +230,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
 def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     from pde.wave_2d_nonlinear import setup_wave2d_nonlinear
     import config.wave_2d_nonlinear_config as cfg
-    from ml.models import CNN
+    from ml.models import CNN, UNet
     from ml.snapshot import load_checkpoint
 
     nwd = cfg.nwd
@@ -238,15 +238,25 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     patch_side = cfg.patch_side
     device = get_device()
     model_path = os.path.join(data_dir, cfg.model_pth)
+    ch_mean = ch_std = None
     if model is None:
         if not os.path.isfile(model_path):
             print(f"Model not found: {model_path}. Run: python -m ml.train --problem wave_2d_nonlinear")
             return
-        ckpt = torch.load(model_path, map_location="cpu")
+        ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
         base = ckpt.get("base", 32)
-        model = CNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
+        model_type = ckpt.get("model_type", getattr(cfg, "model_type", "cnn")).lower()
+        if model_type == "unet":
+            model = UNet(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
+        else:
+            model = CNN(Cin=3, Cout=3, base=base, Nx=patch_side, nx=nwd).to(device)
         load_checkpoint(model, model_path)
         model.eval()
+        ch_mean = ckpt.get("ch_mean", None)  # (C,) or None
+        ch_std = ckpt.get("ch_std", None)
+        residual = ckpt.get("residual", False)
+    else:
+        residual = False
 
     h, qx, qy, rhs, advance_fn, dt, xx, yy = setup_wave2d_nonlinear(
         cfg.Lx, cfg.Ly, cfg.nx, cfg.ny,
@@ -259,20 +269,33 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
     steps_per_nn = cfg.TSCREEN * cfg.njp
     n_nn_steps = int(round(cfg.compare_TF / (steps_per_nn * dt)))
 
-    def integrate_nn_cnn(model, U0, nwd, nst, patch_side, device):
+    def integrate_nn_cnn(model, U0, nwd, nst, patch_side, device, ch_mean=None, ch_std=None, residual=False):
         nx, ny, _ = U0.shape
         U_nn = np.zeros_like(U0)
         u1 = _boundary_ext_2d_periodic(U0[:, :, 0], nst)
         u2 = _boundary_ext_2d_periodic(U0[:, :, 1], nst)
         u3 = _boundary_ext_2d_periodic(U0[:, :, 2], nst)
+        if ch_mean is not None:
+            mean_t = torch.tensor(ch_mean, dtype=torch.float32).view(1, -1, 1, 1).to(device)
+            std_t = torch.tensor(ch_std, dtype=torch.float32).view(1, -1, 1, 1).to(device)
         for ii in range(nx // nwd):
             for jj in range(ny // nwd):
                 ind1 = slice(ii * nwd, ii * nwd + patch_side)
                 ind2 = slice(jj * nwd, jj * nwd + patch_side)
                 tmp = np.stack([u1[ind1, ind2], u2[ind1, ind2], u3[ind1, ind2]], axis=0)
                 inp = torch.tensor(tmp, dtype=torch.float32).unsqueeze(0).to(device)
+                if ch_mean is not None:
+                    inp_norm = (inp - mean_t) / std_t
+                else:
+                    inp_norm = inp
                 with torch.no_grad():
-                    out = model(inp)
+                    out_norm = model(inp_norm)
+                if residual:
+                    out_norm = inp_norm[:, :, nst:nst + nwd, nst:nst + nwd] + out_norm
+                if ch_mean is not None:
+                    out = out_norm * std_t + mean_t
+                else:
+                    out = out_norm
                 out = out.cpu().numpy().squeeze(0)
                 U_nn[ii * nwd : (ii + 1) * nwd, jj * nwd : (jj + 1) * nwd, :] = np.transpose(out, (1, 2, 0))
         return U_nn
@@ -297,13 +320,19 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
         spec_time_list.append(spec_elapsed)
 
         t0 = time.perf_counter()
-        U_nn = integrate_nn_cnn(model, U_nn, nwd, nst, patch_side, device)
+        U_nn = integrate_nn_cnn(model, U_nn, nwd, nst, patch_side, device, ch_mean=ch_mean, ch_std=ch_std, residual=residual)
         nn_elapsed += time.perf_counter() - t0
         nn_frames.append(U_nn.copy())
         nn_time_list.append(nn_elapsed)
 
     err_per_frame = [np.abs(spec_frames[i] - nn_frames[i]).mean() for i in range(len(nn_frames))]
     print(f"  L1 error mean: {np.mean(err_per_frame):.6f}, max frame: {np.max(err_per_frame):.6f}")
+    ch_names = ["h-h0", "qx", "qy"]
+    for c, name in enumerate(ch_names):
+        ch_err = np.mean([np.abs(spec_frames[i][:, :, c] - nn_frames[i][:, :, c]).mean() for i in range(len(nn_frames))])
+        ch_scale = np.mean([np.abs(spec_frames[i][:, :, c]).mean() for i in range(1, len(spec_frames))])
+        rel_err = ch_err / max(ch_scale, 1e-10)
+        print(f"    {name}: abs={ch_err:.6f}, scale={ch_scale:.6f}, rel={rel_err:.4f}")
 
     comp_names = ["h - h0", "qx", "qy"]
     clims = []

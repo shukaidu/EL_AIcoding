@@ -43,16 +43,18 @@ ic_list = ["random", "ring"]
 # Training
 b_size = 100
 num_epochs = 150
-base = 32        # CNN base channels
+base = 32        # model base channels
+model_type = "unet"   # "cnn" | "unet"
+residual = True       # predict delta (next - current) instead of next state
 lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
-smooth_weight = [1e-2, 0, 0]      # per-channel [h-h0, qx, qy]
+smooth_weight = [0, 1e-1, 1e-1]      # per-channel [h-h0, qx, qy]
 smooth_mode = "absolute"   # "absolute" | "relative"
-param_ratio   = [10.0, 1.0, 1.0]     # h 通道数据损失×10
+param_ratio   = [1.0, 1.0, 1.0]     # h 通道数据损失×10
 
 warmup_T = 5.0   # frames before this time are excluded from training
 
 # Compare (reference vs NN rollout)
-compare_TF = 2.0
+compare_TF = 4.0
 compare_ic = "random"
 compare_seed = 42
 sample_seed = 123
