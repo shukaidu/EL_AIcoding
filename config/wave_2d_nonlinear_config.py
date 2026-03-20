@@ -38,7 +38,6 @@ patch_side = nwd + 2 * nst
 nsamp = 3000
 ntest = 5
 ic_list = ["random", "ring"]
-#ic_list = ["random"]
 
 # Training
 b_size = 100
@@ -48,7 +47,7 @@ model_type = "unet"   # "cnn" | "unet"
 pooling = "max"       # "max" | "avg" | "stride"
 residual = True       # predict delta (next - current) instead of next state
 lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
-smooth_weight = [0, 1e-1, 1e-1]      # per-channel [h-h0, qx, qy]
+smooth_weight = [0, 1e0, 1e0]      # per-channel [h-h0, qx, qy]
 smooth_mode = "absolute"   # "absolute" | "relative"
 param_ratio   = [1.0, 1.0, 1.0]     # h 通道数据损失×10
 

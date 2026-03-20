@@ -45,6 +45,3 @@ compare_n_times = 6
 data_mat = "data_wave.mat"
 model_pth = "data_wave_model.pth"
 error_mat = "data_wave_error.mat"
-
-
-

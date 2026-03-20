@@ -1,18 +1,21 @@
 """MLP with configurable activation."""
 import torch.nn as nn
 
+_ACTIVATIONS = {
+    "relu": nn.ReLU,
+    "tanh": nn.Tanh,
+    "gelu": nn.GELU,
+    "linear": nn.Identity,
+    "identity": nn.Identity,
+    "none": nn.Identity,
+}
+
 
 def _make_activation(name: str) -> nn.Module:
     key = str(name).strip().lower()
-    if key == "relu":
-        return nn.ReLU()
-    if key == "tanh":
-        return nn.Tanh()
-    if key == "gelu":
-        return nn.GELU()
-    if key in ("linear", "identity", "none"):
-        return nn.Identity()
-    raise ValueError(f"Unsupported MLP activation: {name}")
+    if key not in _ACTIVATIONS:
+        raise ValueError(f"Unsupported MLP activation: {name}")
+    return _ACTIVATIONS[key]()
 
 
 class MLP(nn.Module):

@@ -16,72 +16,84 @@ from ml.train_loop import get_device, plot_training_history
 from ml.snapshot import save_checkpoint
 
 
+def _tv_loss(pred, smooth_weight, smooth_mode):
+    """Total-variation regularisation loss over spatial dimensions."""
+    C = pred.shape[1]
+    weights = [smooth_weight] * C if isinstance(smooth_weight, (int, float)) else list(smooth_weight)
+    tv = 0.0
+    for c, w in enumerate(weights):
+        if w == 0.0:
+            continue
+        pc = pred[:, c]
+        gx = pc[:, :, 1:] - pc[:, :, :-1]
+        gy = pc[:, 1:, :] - pc[:, :-1, :]
+        tv_c = gx.abs().mean() + gy.abs().mean()
+        if smooth_mode == "relative":
+            tv_c = tv_c / pc.abs().mean().clamp(min=1e-6)
+        tv = tv + w * tv_c
+    return tv
+
+
+def _eval_loss(model, loader, crit, crit_none, param_ratio, device):
+    """Mean test loss over loader."""
+    model.eval()
+    with torch.no_grad():
+        if param_ratio is not None:
+            w = torch.tensor(param_ratio, dtype=torch.float32, device=device)
+            total = sum((crit_none(model(i), t).mean(dim=(0, 2, 3)) * w).sum().item()
+                        for i, t in loader)
+        else:
+            total = sum(crit(model(i), t).item() for i, t in loader)
+    return total / len(loader)
+
+
 def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule,
                 smooth_weight=0.0, smooth_mode="absolute", param_ratio=None):
     crit = torch.nn.L1Loss(reduction="mean")
     crit_none = torch.nn.L1Loss(reduction="none")
     hist_tr, hist_te = [], []
+    device = next(model.parameters()).device
+
     for epoch in range(1, num_epochs + 1):
         lr = next(lr for e, lr in lr_schedule if epoch <= e)
         for pg in optimizer.param_groups:
             pg["lr"] = lr
+
         model.train()
         tr = 0.0
-        for i, t in train_loader:
-            pred = model(i)
+        for inp, tgt in train_loader:
+            pred = model(inp)
             if param_ratio is not None:
                 w = torch.tensor(param_ratio, dtype=torch.float32, device=pred.device)
-                loss = (crit_none(pred, t).mean(dim=(0, 2, 3)) * w).sum()
+                loss = (crit_none(pred, tgt).mean(dim=(0, 2, 3)) * w).sum()
             else:
-                loss = crit(pred, t)
-            # 支持标量或 per-channel 列表
-            C = pred.shape[1]
-            if isinstance(smooth_weight, (int, float)):
-                weights = [smooth_weight] * C
-            else:
-                weights = list(smooth_weight)
-            tv = 0.0
-            for c, w in enumerate(weights):
-                if w == 0.0:
-                    continue
-                pc = pred[:, c]                          # (B, H, W)
-                gx_c = pc[:, :, 1:] - pc[:, :, :-1]
-                gy_c = pc[:, 1:, :] - pc[:, :-1, :]
-                if smooth_mode == "relative":
-                    scale_c = pc.abs().mean().clamp(min=1e-6)
-                    tv = tv + w * (gx_c.abs().mean() + gy_c.abs().mean()) / scale_c
-                else:  # "absolute"
-                    tv = tv + w * (gx_c.abs().mean() + gy_c.abs().mean())
+                loss = crit(pred, tgt)
+            tv = _tv_loss(pred, smooth_weight, smooth_mode)
             if tv != 0.0:
                 loss = loss + tv
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             tr += loss.item()
-        tr /= len(train_loader)
-        hist_tr.append(tr)
-        model.eval()
-        with torch.no_grad():
-            if param_ratio is not None:
-                w = torch.tensor(param_ratio, dtype=torch.float32, device=next(model.parameters()).device)
-                te = sum((crit_none(model(i), t).mean(dim=(0, 2, 3)) * w).sum().item()
-                         for i, t in test_loader) / len(test_loader)
-            else:
-                te = sum(crit(model(i), t).item() for i, t in test_loader) / len(test_loader)
+        hist_tr.append(tr / len(train_loader))
+
+        te = _eval_loss(model, test_loader, crit, crit_none, param_ratio, device)
         hist_te.append(te)
-        print(f"Epoch [{epoch}/{num_epochs}], lr={lr:.0e}, Train: {tr:.6f}, Test: {te:.6f}")
+        print(f"Epoch [{epoch}/{num_epochs}], lr={lr:.0e}, Train: {hist_tr[-1]:.6f}, Test: {te:.6f}")
+
     return hist_tr, hist_te
 
 
 def _run(model, train_loader, test_loader, cfg, data_dir, **ckpt_extra):
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr_schedule[0][1])
-    smooth_weight = getattr(cfg, "smooth_weight", 0.0)
-    smooth_mode = getattr(cfg, "smooth_mode", "absolute")
-    param_ratio = getattr(cfg, "param_ratio", None)
-    hist_tr, hist_te = _run_epochs(model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule,
-                                   smooth_weight=smooth_weight, smooth_mode=smooth_mode,
-                                   param_ratio=param_ratio)
-    save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te, os.path.join(data_dir, cfg.model_pth), **ckpt_extra)
+    hist_tr, hist_te = _run_epochs(
+        model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule,
+        smooth_weight=getattr(cfg, "smooth_weight", 0.0),
+        smooth_mode=getattr(cfg, "smooth_mode", "absolute"),
+        param_ratio=getattr(cfg, "param_ratio", None),
+    )
+    save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te,
+                    os.path.join(data_dir, cfg.model_pth), **ckpt_extra)
     savemat(os.path.join(data_dir, cfg.error_mat), {"train_err": hist_tr, "test_err": hist_te})
     plot_training_history(hist_tr, hist_te, os.path.join(data_dir, "training_history.png"))
     print(f"Saved {os.path.join(data_dir, cfg.model_pth)}")
@@ -96,7 +108,6 @@ def main():
     device = get_device()
     print(f"Training on: {device}")
 
-    # burgers_1d and wave_2d_linear both use MLP + flat .mat loader
     _MLP_PROBLEMS = {
         "burgers_1d": "config.burgers_1d_config",
         "wave_2d_linear": "config.wave_2d_linear_config",
@@ -120,7 +131,8 @@ def main():
             print(f"Data not found: {path}. Run: python gen_data.py --problem wave_2d_nonlinear")
             return
         residual = getattr(cfg, "residual", False)
-        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny, stats = load_wave_2d_nonlinear(path, device, b_size=cfg.b_size, residual=residual)
+        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny, stats = load_wave_2d_nonlinear(
+            path, device, b_size=cfg.b_size, residual=residual)
         model_type = getattr(cfg, "model_type", "cnn").lower()
         if model_type == "unet":
             pooling = getattr(cfg, "pooling", "max")
@@ -130,10 +142,7 @@ def main():
             model = CNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
         _run(model, tl, vl, cfg, data_dir, base=cfg.base, model_type=model_type, pooling=pooling,
              ch_mean=stats["ch_mean"], ch_std=stats["ch_std"], residual=residual)
-        return
 
 
 if __name__ == "__main__":
     main()
-
-

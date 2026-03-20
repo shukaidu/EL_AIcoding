@@ -8,8 +8,7 @@ def gen_dist_1d(N: int, alpha: float, rng):
     """Random smooth 1D field with Fourier decay ~ 1/(1+|k|^alpha). Returns real 1D array (N,)."""
     k = np.arange(-N // 2, N // 2)
     decay = 1.0 + np.abs(k) ** alpha
-    Y = (rng.standard_normal(N) + 1j * rng.standard_normal(N)) / decay
-    Y = np.fft.ifftshift(Y)
+    Y = np.fft.ifftshift((rng.standard_normal(N) + 1j * rng.standard_normal(N)) / decay)
     f = np.real(np.fft.ifft(Y)) * N
     f -= f.mean()
     max_abs = np.max(np.abs(f))
@@ -25,18 +24,26 @@ def build_diffusion_matrix(nx: int, dt: float, dx: float, nu: float):
     This matches the MATLAB construction in integrateBurger.m.
     """
     e = np.ones(nx)
-    diagonals = [e, -2.0 * e, e]
-    offsets = [-1, 0, 1]
-
-    Lmat = diags(diagonals, offsets, shape=(nx, nx), format="csr")
-    # periodic BCs
-    Lmat = Lmat.tolil()
+    Lmat = diags([e, -2.0 * e, e], [-1, 0, 1], shape=(nx, nx), format="lil")
     Lmat[0, -1] = 1.0
     Lmat[-1, 0] = 1.0
-    Lmat = Lmat.tocsr()
+    return eye(nx, format="csr") - (nu * dt / dx**2) * Lmat.tocsr()
 
-    A = eye(nx, format="csr") - (nu * dt / dx**2) * Lmat
-    return A
+
+def _godunov_flux(u_ext):
+    """Vectorised Godunov flux for Burgers' equation. u_ext has length nx+2."""
+    u_L = u_ext[:-1]
+    u_R = u_ext[1:]
+    # Rarefaction: min of f at both sides; shock: upwind based on sign of s
+    f_L = 0.5 * u_L ** 2
+    f_R = 0.5 * u_R ** 2
+    # Shock: s = (f_R - f_L)/(u_R - u_L) = (u_L + u_R)/2
+    s = 0.5 * (u_L + u_R)
+    shock = u_L > u_R          # entropy-satisfying shock
+    raref = ~shock             # rarefaction fan
+    F = np.where(shock, np.where(s >= 0, f_L, f_R),
+                 np.where(u_L >= 0, f_L, np.where(u_R <= 0, f_R, 0.0)))
+    return F
 
 
 def integrate_burger(u, dt: float, dx: float, nu: float, A=None):
@@ -48,37 +55,12 @@ def integrate_burger(u, dt: float, dx: float, nu: float, A=None):
     """
     u = np.asarray(u, dtype=float)
     nx = u.size
-
-    # Godunov flux (explicit convection)
-    F = np.zeros(nx + 1)
     u_ext = np.concatenate([u[-1:], u, u[:1]])
-
-    for i in range(nx + 1):
-        u_L = u_ext[i]
-        u_R = u_ext[i + 1]
-
-        if u_L <= u_R:
-            if u_L >= 0:
-                F[i] = 0.5 * u_L**2
-            elif u_R <= 0:
-                F[i] = 0.5 * u_R**2
-            else:
-                F[i] = 0.0
-        else:
-            s = (0.5 * u_R**2 - 0.5 * u_L**2) / (u_R - u_L)
-            if s >= 0:
-                F[i] = 0.5 * u_L**2
-            else:
-                F[i] = 0.5 * u_R**2
-
-    u_star = u - dt / dx * (F[1:] - F[:-1])
-
-    # Implicit diffusion: (I - nu*dt/dx^2 * L) u^{n+1} = u_star
+    F = _godunov_flux(u_ext)
+    u_star = u - (dt / dx) * (F[1:] - F[:-1])
     if A is None:
         A = build_diffusion_matrix(nx, dt, dx, nu)
-
-    u_next = spsolve(A, u_star)
-    return u_next
+    return spsolve(A, u_star)
 
 
 def setup_burger(nx, dx, dt, L, nu, alpha, u_mean, rng_seed):
@@ -127,4 +109,3 @@ if __name__ == "__main__":
     )
     print(f"nx={cfg.nx}  n_frames={u_hist.shape[1]}  t_end={t_hist[-1]:.4f}")
     print(f"u0 mean={u_hist[:, 0].mean():.6f}  u_final mean={u_hist[:, -1].mean():.6f}")
-

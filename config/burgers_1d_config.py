@@ -55,6 +55,3 @@ compare_n_times = 6
 data_mat = "data_res.mat"
 model_pth = "data_res_model.pth"
 error_mat = "data_res_error.mat"
-
-
-
