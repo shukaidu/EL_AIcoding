@@ -86,9 +86,8 @@ def _build_ic(ic_type, xx, yy, Lx, Ly, Nx, Ny, K2, rng_seed, c):
     elif ic_type == "random_white":
         smooth = 0.1
         u0 = rng.standard_normal((Nx, Ny))
-        if smooth > 0:
-            Ghat = np.exp(-(smooth**2) * K2)
-            u0 = np.real(np.fft.ifft2(np.fft.fft2(u0) * Ghat))
+        Ghat = np.exp(-(smooth**2) * K2)
+        u0 = np.real(np.fft.ifft2(np.fft.fft2(u0) * Ghat))
         u0 = u0 / (np.max(np.abs(u0)) + 1e-12)
         v0 = np.zeros_like(u0)
 

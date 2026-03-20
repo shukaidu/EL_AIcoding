@@ -165,18 +165,14 @@ def run_wave_2d_nonlinear(data_dir):
         if cnt >= cfg.nsamp:
             break
 
-    import scipy.io as sio
-    os.makedirs(data_dir, exist_ok=True)
-    out_path = os.path.join(data_dir, cfg.data_mat)
-    sio.savemat(out_path, {"input_tensor": input_tensor, "output_tensor": output_tensor}, do_compression=True)
-    print(f"Saved {out_path}  input {input_tensor.shape}  output {output_tensor.shape}")
+    _save_mat(data_dir, cfg.data_mat, input_tensor, output_tensor)
 
 
 def _save_mat(data_dir, filename, input_arr, output_arr):
     """通用：保存 input_tensor / output_tensor 到 .mat 文件并打印。"""
     os.makedirs(data_dir, exist_ok=True)
     out_path = os.path.join(data_dir, filename)
-    savemat(out_path, {"input_tensor": input_arr, "output_tensor": output_arr})
+    savemat(out_path, {"input_tensor": input_arr, "output_tensor": output_arr}, do_compression=True)
     print(f"Saved {out_path}  input {input_arr.shape}  output {output_arr.shape}")
 
 

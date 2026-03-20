@@ -36,10 +36,8 @@ def _timing_annotation(ax_or_fig, ref_t, nn_t, use_fig=False):
     txt = f"Ref: {ref_t:.3f} s\nNN: {nn_t:.4f} s\nSpeedup: {_speedup_str(ref_t, nn_t)}"
     kw = dict(fontsize=9, verticalalignment="top",
                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
-    if use_fig:
-        ax_or_fig.text(0.02, 0.98, txt, **kw)
-    else:
-        ax_or_fig.text(0.02, 0.98, txt, transform=ax_or_fig.transAxes, **kw)
+    extra = {} if use_fig else {"transform": ax_or_fig.transAxes}
+    ax_or_fig.text(0.02, 0.98, txt, **kw, **extra)
 
 
 def _load_mlp(model_path, N_i, N_o, cfg, device):
@@ -235,8 +233,8 @@ def _integrate_nn_cnn(model, U0, nwd, nst, patch_side, device, ch_mean=None, ch_
     u_exts = [_boundary_ext_2d_periodic(U0[:, :, c], nst) for c in range(3)]
     U_nn = np.zeros_like(U0)
 
-    mean_t = std_t = None
-    if ch_mean is not None:
+    normalise = ch_mean is not None
+    if normalise:
         mean_t = torch.tensor(ch_mean, dtype=torch.float32).view(1, -1, 1, 1).to(device)
         std_t = torch.tensor(ch_std, dtype=torch.float32).view(1, -1, 1, 1).to(device)
 
@@ -246,12 +244,12 @@ def _integrate_nn_cnn(model, U0, nwd, nst, patch_side, device, ch_mean=None, ch_
             s2 = slice(jj * nwd, jj * nwd + patch_side)
             patch = np.stack([e[s1, s2] for e in u_exts], axis=0)
             inp = torch.tensor(patch, dtype=torch.float32).unsqueeze(0).to(device)
-            inp_norm = (inp - mean_t) / std_t if mean_t is not None else inp
+            inp_norm = (inp - mean_t) / std_t if normalise else inp
             with torch.no_grad():
                 out_norm = model(inp_norm)
             if residual:
                 out_norm = inp_norm[:, :, nst:nst + nwd, nst:nst + nwd] + out_norm
-            out = (out_norm * std_t + mean_t if mean_t is not None else out_norm)
+            out = out_norm * std_t + mean_t if normalise else out_norm
             U_nn[ii * nwd : (ii + 1) * nwd, jj * nwd : (jj + 1) * nwd, :] = \
                 np.transpose(out.cpu().numpy().squeeze(0), (1, 2, 0))
     return U_nn

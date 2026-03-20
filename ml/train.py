@@ -34,25 +34,25 @@ def _tv_loss(pred, smooth_weight, smooth_mode):
     return tv
 
 
-def _eval_loss(model, loader, crit, crit_none, param_ratio, device):
+def _weighted_loss(crit_none, pred, tgt, w):
+    raw = crit_none(pred, tgt)
+    return raw.mean() if w is None else (raw.mean(dim=(0, 2, 3)) * w).sum()
+
+
+def _eval_loss(model, loader, crit_none, w, device):
     """Mean test loss over loader."""
     model.eval()
     with torch.no_grad():
-        if param_ratio is not None:
-            w = torch.tensor(param_ratio, dtype=torch.float32, device=device)
-            total = sum((crit_none(model(i), t).mean(dim=(0, 2, 3)) * w).sum().item()
-                        for i, t in loader)
-        else:
-            total = sum(crit(model(i), t).item() for i, t in loader)
+        total = sum(_weighted_loss(crit_none, model(i), t, w).item() for i, t in loader)
     return total / len(loader)
 
 
 def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule,
                 smooth_weight=0.0, smooth_mode="absolute", param_ratio=None):
-    crit = torch.nn.L1Loss(reduction="mean")
     crit_none = torch.nn.L1Loss(reduction="none")
     hist_tr, hist_te = [], []
     device = next(model.parameters()).device
+    w = torch.tensor(param_ratio, dtype=torch.float32, device=device) if param_ratio is not None else None
 
     for epoch in range(1, num_epochs + 1):
         lr = next(lr for e, lr in lr_schedule if epoch <= e)
@@ -63,21 +63,16 @@ def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_sche
         tr = 0.0
         for inp, tgt in train_loader:
             pred = model(inp)
-            if param_ratio is not None:
-                w = torch.tensor(param_ratio, dtype=torch.float32, device=pred.device)
-                loss = (crit_none(pred, tgt).mean(dim=(0, 2, 3)) * w).sum()
-            else:
-                loss = crit(pred, tgt)
-            tv = _tv_loss(pred, smooth_weight, smooth_mode)
-            if tv != 0.0:
-                loss = loss + tv
+            loss = _weighted_loss(crit_none, pred, tgt, w)
+            data_loss = loss.item()
+            loss = loss + _tv_loss(pred, smooth_weight, smooth_mode)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            tr += loss.item()
+            tr += data_loss
         hist_tr.append(tr / len(train_loader))
 
-        te = _eval_loss(model, test_loader, crit, crit_none, param_ratio, device)
+        te = _eval_loss(model, test_loader, crit_none, w, device)
         hist_te.append(te)
         print(f"Epoch [{epoch}/{num_epochs}], lr={lr:.0e}, Train: {hist_tr[-1]:.6f}, Test: {te:.6f}")
 
@@ -134,14 +129,15 @@ def main():
         tl, vl, _, C_in, C_out, Nx, Ny, nx, ny, stats = load_wave_2d_nonlinear(
             path, device, b_size=cfg.b_size, residual=residual)
         model_type = getattr(cfg, "model_type", "cnn").lower()
+        ckpt_extra = dict(base=cfg.base, model_type=model_type,
+                          ch_mean=stats["ch_mean"], ch_std=stats["ch_std"], residual=residual)
         if model_type == "unet":
             pooling = getattr(cfg, "pooling", "max")
             model = UNet(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx, pooling=pooling).to(device)
+            ckpt_extra["pooling"] = pooling
         else:
-            pooling = "max"
             model = CNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
-        _run(model, tl, vl, cfg, data_dir, base=cfg.base, model_type=model_type, pooling=pooling,
-             ch_mean=stats["ch_mean"], ch_std=stats["ch_std"], residual=residual)
+        _run(model, tl, vl, cfg, data_dir, **ckpt_extra)
 
 
 if __name__ == "__main__":

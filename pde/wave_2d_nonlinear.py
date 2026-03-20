@@ -83,20 +83,15 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
         h_safe = np.maximum(h, 1e-10)
         u = qx / h_safe
         v = qy / h_safe
-        dhdt = -(Dx_lin(qx) + Dy_lin(qy))
-        if nudging_coeff != 0.0:
-            dhdt = dhdt - nudging_coeff * (h - h0)  # nudging toward h0
+        dhdt = -(Dx_lin(qx) + Dy_lin(qy)) - nudging_coeff * (h - h0) + nu_h * LAP(h)
         Fxx = qx * u + 0.5 * g * h**2
         Fxy = qx * v
         Gyx = qy * u
         Gyy = qy * v + 0.5 * g * h**2
-        dqxdt = -Dx_lin(filter_nl(Fxx)) - Dy_lin(filter_nl(Fxy)) - f_coriolis * h * v
-        dqydt = -Dx_lin(filter_nl(Gyx)) - Dy_lin(filter_nl(Gyy)) + f_coriolis * h * u
-        if nu_h != 0:
-            dhdt = dhdt + nu_h * LAP(h)
-        if nu_q != 0:
-            dqxdt = dqxdt + nu_q * LAP(qx)
-            dqydt = dqydt + nu_q * LAP(qy)
+        dqxdt = (-Dx_lin(filter_nl(Fxx)) - Dy_lin(filter_nl(Fxy))
+                 - f_coriolis * h * v + nu_q * LAP(qx))
+        dqydt = (-Dx_lin(filter_nl(Gyx)) - Dy_lin(filter_nl(Gyy))
+                 + f_coriolis * h * u + nu_q * LAP(qy))
         return dhdt, dqxdt, dqydt
 
     def rhs_nonlinear(h, qx, qy):
@@ -106,11 +101,7 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
         v = qy / h_safe
 
         # dhdt：N 部分只含 nudging + diffusion（连续方程 -∇·q 归 L）
-        dhdt = 0.0
-        if nudging_coeff != 0.0:
-            dhdt = dhdt - nudging_coeff * (h - h0)
-        if nu_h != 0:
-            dhdt = dhdt + nu_h * LAP(h)
+        dhdt = -nudging_coeff * (h - h0) + nu_h * LAP(h)
 
         # 动量 N 部分：非线性对流 + 非线性压力修正 + Coriolis + diffusion
         # Fxx_nl = qx*u + 0.5*g*(h²-2·h0·h)：线性压力部分 g·h0·h 已在 L 中
@@ -118,11 +109,10 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
         Fxy_nl = qx * v
         Gyx_nl = qy * u
         Gyy_nl = qy * v + 0.5 * g * (h**2 - 2 * h0 * h)
-        dqxdt = -Dx_lin(filter_nl(Fxx_nl)) - Dy_lin(filter_nl(Fxy_nl)) - f_coriolis * h * v
-        dqydt = -Dx_lin(filter_nl(Gyx_nl)) - Dy_lin(filter_nl(Gyy_nl)) + f_coriolis * h * u
-        if nu_q != 0:
-            dqxdt = dqxdt + nu_q * LAP(qx)
-            dqydt = dqydt + nu_q * LAP(qy)
+        dqxdt = (-Dx_lin(filter_nl(Fxx_nl)) - Dy_lin(filter_nl(Fxy_nl))
+                 - f_coriolis * h * v + nu_q * LAP(qx))
+        dqydt = (-Dx_lin(filter_nl(Gyx_nl)) - Dy_lin(filter_nl(Gyy_nl))
+                 + f_coriolis * h * u + nu_q * LAP(qy))
         return dhdt, dqxdt, dqydt
 
     def _cn_step(h, qx, qy, dt):
