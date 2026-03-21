@@ -28,6 +28,7 @@ rng_seeds = list(range(1, 21))
 
 # Training
 b_size = 128
+test_split = 0.2
 num_epochs = 2500
 hidden_size = 256
 num_layers = 1

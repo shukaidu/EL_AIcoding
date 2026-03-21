@@ -40,17 +40,12 @@ def _timing_annotation(ax_or_fig, ref_t, nn_t, use_fig=False):
     ax_or_fig.text(0.02, 0.98, txt, **kw, **extra)
 
 
-def _load_mlp(model_path, N_i, N_o, cfg, device):
+def _load_mlp(model_path, N_i, N_o, device):
     """加载 MLP checkpoint，返回已 eval 的 model。"""
     from ml.models import MLP
     from ml.snapshot import load_checkpoint
     ckpt = torch.load(model_path, map_location="cpu")
-    model = MLP(
-        N_i, N_o,
-        hidden_size=ckpt.get("hidden_size", 256),
-        num_layers=ckpt.get("num_layers", 6),
-        activation=ckpt.get("activation", getattr(cfg, "activation", "relu")),
-    ).to(device)
+    model = MLP(N_i, N_o, ckpt["hidden_size"], ckpt["num_layers"], ckpt["activation"]).to(device)
     load_checkpoint(model, model_path)
     model.eval()
     return model
@@ -67,8 +62,9 @@ def _check_model_file(model_path, problem):
 # Burgers 1D
 # ---------------------------------------------------------------------------
 
-def _integrate_nn_burgers(model, u, nx, nwd, nst, device):
+def _integrate_nn_burgers(model, u, cfg, device):
     """Run one NN step for 1D Burgers (sliding window over tiles)."""
+    nx, nwd, nst = cfg.nx, cfg.nwd, cfg.nst
     u_ext = np.concatenate([u[-nst:], u, u[:nst]])
     u_out = np.zeros_like(u)
     for i in range(nx // nwd):
@@ -95,7 +91,7 @@ def _compare_burgers_1d(data_dir, out_dir):
     n_nn_steps = int(round(cfg.compare_t_end / dt_nn))
 
     u0, xc, A = setup_burger(nx, dx, dt, cfg.L, cfg.nu, cfg.alpha, cfg.u_mean, cfg.compare_seed)
-    model = _load_mlp(model_path, 2 * nst + nwd, nwd, cfg, device)
+    model = _load_mlp(model_path, 2 * nst + nwd, nwd, device)
 
     u_fv, u_nn = u0.copy(), u0.copy()
     fv_list, nn_list = [u_fv.copy()], [u_nn.copy()]
@@ -111,7 +107,7 @@ def _compare_burgers_1d(data_dir, out_dir):
         fv_times.append(fv_elapsed)
 
         t0 = time.perf_counter()
-        u_nn = _integrate_nn_burgers(model, u_nn, nx, nwd, nst, device)
+        u_nn = _integrate_nn_burgers(model, u_nn, cfg, device)
         nn_elapsed += time.perf_counter() - t0
         nn_list.append(u_nn.copy())
         nn_times.append(nn_elapsed)
@@ -144,8 +140,9 @@ def _compare_burgers_1d(data_dir, out_dir):
 # Wave 2D linear
 # ---------------------------------------------------------------------------
 
-def _integrate_nn_wave2d(u2d, v2d, model, nwd, nst, patch_side, device):
+def _integrate_nn_wave2d(u2d, v2d, model, cfg, device):
     """Run one NN step for 2D linear wave (tiled over patches)."""
+    nwd, nst, patch_side = cfg.nwd, cfg.nst, cfg.patch_side
     NX, NY = u2d.shape
     u_ext = _boundary_ext_2d_periodic(u2d, nst)
     v_ext = _boundary_ext_2d_periodic(v2d, nst)
@@ -174,7 +171,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
     if not _check_model_file(model_path, "wave_2d_linear"):
         return
 
-    model = _load_mlp(model_path, 2 * cfg.patch_side ** 2, 2 * cfg.nwd ** 2, cfg, device)
+    model = _load_mlp(model_path, 2 * cfg.patch_side ** 2, 2 * cfg.nwd ** 2, device)
     uhat, vhat, omega2, xx, yy, u0, v0 = setup_wave2d(
         cfg.NX, cfg.NY, cfg.Lx, cfg.Ly,
         c=cfg.c, initial_condition=cfg.compare_ic, rng_seed=cfg.compare_seed,
@@ -199,7 +196,7 @@ def _compare_wave_2d_linear(data_dir, out_dir):
         spec_times.append(spec_elapsed)
 
         t0 = time.perf_counter()
-        u_nn, v_nn = _integrate_nn_wave2d(u_nn, v_nn, model, cfg.nwd, cfg.nst, cfg.patch_side, device)
+        u_nn, v_nn = _integrate_nn_wave2d(u_nn, v_nn, model, cfg, device)
         nn_elapsed += time.perf_counter() - t0
         nn_u.append(u_nn.copy())
         nn_v.append(v_nn.copy())
@@ -227,8 +224,9 @@ def _compare_wave_2d_linear(data_dir, out_dir):
 # Wave 2D nonlinear
 # ---------------------------------------------------------------------------
 
-def _integrate_nn_cnn(model, U0, nwd, nst, patch_side, device, ch_mean=None, ch_std=None, residual=False):
+def _integrate_nn_cnn(model, U0, cfg, device, ch_mean, ch_std, residual):
     """Run one NN step for 2D nonlinear shallow water (CNN/UNet, tiled)."""
+    nwd, nst, patch_side = cfg.nwd, cfg.nst, cfg.patch_side
     nx, ny, _ = U0.shape
     u_exts = [_boundary_ext_2d_periodic(U0[:, :, c], nst) for c in range(3)]
     U_nn = np.zeros_like(U0)
@@ -255,7 +253,7 @@ def _integrate_nn_cnn(model, U0, nwd, nst, patch_side, device, ch_mean=None, ch_
     return U_nn
 
 
-def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
+def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None, residual=False, ch_mean=None, ch_std=None):
     from pde.wave_2d_nonlinear import setup_wave2d_nonlinear
     import config.wave_2d_nonlinear_config as cfg
     from ml.models import CNN, UNet
@@ -263,32 +261,26 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
 
     device = get_device()
     model_path = os.path.join(data_dir, cfg.model_pth)
-    ch_mean = ch_std = None
-    residual = False
 
     if model is None:
         if not _check_model_file(model_path, "wave_2d_nonlinear"):
             return
         ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
-        base = ckpt.get("base", 32)
-        model_type = ckpt.get("model_type", getattr(cfg, "model_type", "cnn")).lower()
+        model_type = ckpt["model_type"].lower()
         if model_type == "unet":
-            pooling = ckpt.get("pooling", getattr(cfg, "pooling", "max"))
-            model = UNet(Cin=3, Cout=3, base=base, Nx=cfg.patch_side, nx=cfg.nwd, pooling=pooling).to(device)
+            model = UNet(3, 3, ckpt["base"], cfg.patch_side, cfg.nwd, ckpt["pooling"]).to(device)
         else:
-            model = CNN(Cin=3, Cout=3, base=base, Nx=cfg.patch_side, nx=cfg.nwd).to(device)
+            model = CNN(3, 3, ckpt["base"], cfg.patch_side, cfg.nwd).to(device)
         load_checkpoint(model, model_path)
         model.eval()
         ch_mean = ckpt.get("ch_mean")
         ch_std = ckpt.get("ch_std")
-        residual = ckpt.get("residual", False)
+        residual = ckpt["residual"]
 
     h, qx, qy, _, advance_fn, dt, xx, yy = setup_wave2d_nonlinear(
-        cfg.Lx, cfg.Ly, cfg.nx, cfg.ny,
-        g=cfg.g, h0=cfg.h0, f_coriolis=cfg.f_coriolis, nu_h=cfg.nu_h, nu_q=cfg.nu_q,
-        nudging_coeff=cfg.nudging_coeff,
-        initial_condition=cfg.compare_ic, rng_seed=cfg.compare_seed,
-        integrator=cfg.integrator, dt=cfg.dt_internal,
+        cfg.Lx, cfg.Ly, cfg.nx, cfg.ny, cfg.g, cfg.h0, cfg.f_coriolis,
+        cfg.nu_h, cfg.nu_q, cfg.nudging_coeff, cfg.integrator, cfg.dt_internal,
+        cfg.compare_ic, cfg.compare_seed,
     )
 
     steps_per_nn = cfg.TSCREEN * cfg.njp
@@ -315,8 +307,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None):
         spec_times.append(spec_elapsed)
 
         t0 = time.perf_counter()
-        U_nn = _integrate_nn_cnn(model, U_nn, cfg.nwd, cfg.nst, cfg.patch_side, device,
-                                  ch_mean=ch_mean, ch_std=ch_std, residual=residual)
+        U_nn = _integrate_nn_cnn(model, U_nn, cfg, device, ch_mean, ch_std, residual)
         nn_elapsed += time.perf_counter() - t0
         nn_frames.append(U_nn.copy())
         nn_times.append(nn_elapsed)

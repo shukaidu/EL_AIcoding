@@ -35,6 +35,7 @@ seed_base = 42
 # NN prediction (model & training, for ml/train.py)
 # ---------------------------------------------------------------------------
 b_size = 128
+test_split = 0.2
 num_epochs = 2500
 hidden_size = 128
 num_layers = 5

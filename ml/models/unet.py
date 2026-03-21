@@ -24,7 +24,7 @@ def _make_pool(pooling, ch):
 
 
 class UNet(nn.Module):
-    def __init__(self, Cin, Cout, base, Nx, nx, pooling="max"):
+    def __init__(self, Cin, Cout, base, Nx, nx, pooling):
         super().__init__()
         self._crop_offset = (Nx - nx) // 2
         self._nx = nx

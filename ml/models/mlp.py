@@ -11,20 +11,14 @@ _ACTIVATIONS = {
 }
 
 
-def _make_activation(name: str) -> nn.Module:
-    key = str(name).strip().lower()
-    if key not in _ACTIVATIONS:
-        raise ValueError(f"Unsupported MLP activation: {name}")
-    return _ACTIVATIONS[key]()
-
-
 class MLP(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size=256, num_layers=5, activation="relu"):
+    def __init__(self, input_size, output_size, hidden_size, num_layers, activation):
         super().__init__()
+        act = _ACTIVATIONS[activation]
         layers = []
         d = input_size
         for _ in range(num_layers):
-            layers += [nn.Linear(d, hidden_size), _make_activation(activation)]
+            layers += [nn.Linear(d, hidden_size), act()]
             d = hidden_size
         layers.append(nn.Linear(hidden_size, output_size))
         self.net = nn.Sequential(*layers)

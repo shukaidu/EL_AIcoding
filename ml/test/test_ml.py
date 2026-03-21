@@ -1,6 +1,6 @@
 """
 ml 模块单元测试
-覆盖：_weighted_loss、_tv_loss（ml/train.py）、load_wave_2d_nonlinear（ml/data_io.py）、
+覆盖：load_wave_2d_nonlinear（ml/data_io.py）、
       模型前向传播形状与反向传播（UNet、CNN、MLP）、snapshot 保存/加载
 
 运行方式：
@@ -14,135 +14,18 @@ from unittest.mock import patch
 
 import numpy as np
 import torch
-import torch.nn as nn
 
 _repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
-from ml.train import _weighted_loss, _tv_loss
 from ml.data_io import load_wave_2d_nonlinear
 from ml.models import CNN, UNet, MLP
 from ml.snapshot import save_checkpoint, load_checkpoint
 
 
 # ---------------------------------------------------------------------------
-# 1. _weighted_loss
-#
-# 契约（已写入 docstring 中，测试在此强化）：
-#   - w=None  → 全局 L1 均值
-#   - w=list  → 逐通道均值再按权重加权求和（与全局均值在数值上不同）
-# ---------------------------------------------------------------------------
-
-class TestWeightedLoss(unittest.TestCase):
-
-    def setUp(self):
-        self.crit = nn.L1Loss(reduction="none")
-        torch.manual_seed(0)
-        self.pred = torch.rand(4, 3, 8, 8)
-        self.tgt  = torch.rand(4, 3, 8, 8)
-
-    def test_none_weight_equals_global_mean(self):
-        result   = _weighted_loss(self.crit, self.pred, self.tgt, w=None)
-        expected = (self.pred - self.tgt).abs().mean()
-        self.assertAlmostEqual(result.item(), expected.item(), places=6)
-
-    def test_equal_weights_sum_of_per_channel_means(self):
-        """w=[1,1,1]：逐通道均值之和，不等于全局均值（契约规定的语义）。"""
-        pred = torch.stack([
-            torch.ones(4, 8, 8) * 0.0,
-            torch.ones(4, 8, 8) * 0.5,
-            torch.ones(4, 8, 8) * 1.0,
-        ], dim=1)
-        tgt = torch.zeros(4, 3, 8, 8)
-        w   = torch.tensor([1.0, 1.0, 1.0])
-
-        self.assertAlmostEqual(_weighted_loss(self.crit, pred, tgt, w=w).item(),    1.5, places=6)
-        self.assertAlmostEqual(_weighted_loss(self.crit, pred, tgt, w=None).item(), 0.5, places=6)
-
-    def test_unequal_weights(self):
-        pred = torch.stack([
-            torch.ones(4, 8, 8) * 1.0,
-            torch.ones(4, 8, 8) * 2.0,
-            torch.ones(4, 8, 8) * 3.0,
-        ], dim=1)
-        tgt    = torch.zeros(4, 3, 8, 8)
-        w      = torch.tensor([2.0, 0.5, 1.0])
-        result = _weighted_loss(self.crit, pred, tgt, w=w)
-        self.assertAlmostEqual(result.item(), 6.0, places=6)  # 2*1 + 0.5*2 + 1*3
-
-    def test_zero_inputs_give_zero(self):
-        pred = torch.zeros(4, 3, 8, 8)
-        tgt  = torch.zeros(4, 3, 8, 8)
-        w    = torch.tensor([1.0, 1.0, 1.0])
-        self.assertAlmostEqual(_weighted_loss(self.crit, pred, tgt, w=w).item(),    0.0, places=8)
-        self.assertAlmostEqual(_weighted_loss(self.crit, pred, tgt, w=None).item(), 0.0, places=8)
-
-    def test_zero_channel_weight_ignored(self):
-        pred = torch.stack([
-            torch.ones(4, 8, 8) * 5.0,  # 权重 0，不贡献
-            torch.ones(4, 8, 8) * 1.0,
-            torch.zeros(4, 8, 8),
-        ], dim=1)
-        tgt    = torch.zeros(4, 3, 8, 8)
-        w      = torch.tensor([0.0, 1.0, 1.0])
-        result = _weighted_loss(self.crit, pred, tgt, w=w)
-        self.assertAlmostEqual(result.item(), 1.0, places=6)
-
-
-# ---------------------------------------------------------------------------
-# 2. _tv_loss
-# ---------------------------------------------------------------------------
-
-class TestTvLoss(unittest.TestCase):
-
-    def test_zero_scalar_weight_returns_zero(self):
-        result = _tv_loss(torch.rand(2, 3, 16, 16), smooth_weight=0.0, smooth_mode="absolute")
-        self.assertAlmostEqual(float(result), 0.0, places=8)
-
-    def test_zero_list_weight_returns_zero(self):
-        result = _tv_loss(torch.rand(2, 3, 16, 16), smooth_weight=[0.0, 0.0, 0.0], smooth_mode="absolute")
-        self.assertAlmostEqual(float(result), 0.0, places=8)
-
-    def test_constant_field_zero_tv(self):
-        pred   = torch.ones(2, 3, 16, 16) * 7.0
-        result = _tv_loss(pred, smooth_weight=1.0, smooth_mode="absolute")
-        self.assertAlmostEqual(result.item(), 0.0, places=7)
-
-    def test_known_gradient(self):
-        """列方向线性场：gx=1, gy=0 → TV=1."""
-        H, W = 8, 8
-        col  = torch.arange(W, dtype=torch.float32).view(1, W).expand(H, W)
-        pred = col.unsqueeze(0).unsqueeze(0)
-        self.assertAlmostEqual(_tv_loss(pred, 1.0, "absolute").item(), 1.0, places=6)
-
-    def test_weight_scales_tv(self):
-        H, W = 8, 8
-        col  = torch.arange(W, dtype=torch.float32).view(1, W).expand(H, W)
-        pred = col.unsqueeze(0).unsqueeze(0)
-        self.assertAlmostEqual(_tv_loss(pred, 3.0, "absolute").item(), 3.0, places=6)
-
-    def test_relative_mode(self):
-        H, W    = 8, 8
-        col     = torch.arange(W, dtype=torch.float32).view(1, W).expand(H, W)
-        pred    = col.unsqueeze(0).unsqueeze(0)
-        tv_abs  = _tv_loss(pred, 1.0, "absolute").item()
-        tv_rel  = _tv_loss(pred, 1.0, "relative").item()
-        mean_abs = col.abs().mean().item()
-        self.assertAlmostEqual(tv_rel, tv_abs / max(mean_abs, 1e-6), places=5)
-
-    def test_per_channel_weight_skips_channel(self):
-        B, H, W = 2, 8, 8
-        ch0  = (torch.arange(W) * 1000.0).view(1, W).expand(H, W)
-        ch0  = ch0.unsqueeze(0).unsqueeze(0).expand(B, -1, -1, -1)
-        ch12 = torch.ones(B, 2, H, W)
-        pred = torch.cat([ch0, ch12], dim=1)
-        self.assertAlmostEqual(
-            _tv_loss(pred, [0.0, 1.0, 1.0], "absolute").item(), 0.0, places=6)
-
-
-# ---------------------------------------------------------------------------
-# 3. load_wave_2d_nonlinear — 测真实函数，mock 文件读取，关闭 DataLoader shuffle
+# 1. load_wave_2d_nonlinear — 测真实函数，mock 文件读取，关闭 DataLoader shuffle
 #    （关闭 shuffle 后可逐样本精确比较，避免 sort 掩盖顺序错误）
 # ---------------------------------------------------------------------------
 
@@ -167,8 +50,7 @@ class TestLoadWave2dNonlinear(unittest.TestCase):
         device = torch.device("cpu")
         with patch("scipy.io.loadmat", return_value=mat), \
              patch.object(torch.utils.data, "DataLoader", _no_shuffle_dl):
-            return load_wave_2d_nonlinear(
-                "fake.mat", device, b_size=100, test_split=0.2, residual=residual)
+            return load_wave_2d_nonlinear("fake.mat", device, 100, 0.2, residual)
 
     def test_loader_tensor_shapes(self):
         """train/val loader 第一批数据的 tensor shape 正确。"""
@@ -275,7 +157,7 @@ class TestUNetShape(unittest.TestCase):
         self.assertTrue(torch.isfinite(self._fwd()).all())
 
     def test_backward_pass(self):
-        model = UNet(Cin=_T_CIN, Cout=_T_COUT, base=_T_BASE, Nx=_T_PSZ, nx=_T_NWD)
+        model = UNet(Cin=_T_CIN, Cout=_T_COUT, base=_T_BASE, Nx=_T_PSZ, nx=_T_NWD, pooling="max")
         x = torch.randn(_T_B, _T_CIN, _T_PSZ, _T_PSZ, requires_grad=True)
         model(x).mean().backward()
         self.assertIsNotNone(x.grad)
@@ -312,27 +194,27 @@ class TestCNNShape(unittest.TestCase):
 class TestMLPShape(unittest.TestCase):
 
     def test_output_shape(self):
-        model = MLP(128, 64, hidden_size=64, num_layers=3)
+        model = MLP(128, 64, 64, 3, "relu")
         with torch.no_grad():
             self.assertEqual(model(torch.zeros(8, 128)).shape, (8, 64))
 
     def test_batch_size_varies(self):
-        model = MLP(32, 16, hidden_size=32, num_layers=2)
+        model = MLP(32, 16, 32, 2, "relu")
         for B in [1, 5, 100]:
             with torch.no_grad():
                 self.assertEqual(model(torch.zeros(B, 32)).shape, (B, 16))
 
     def test_tanh_activation(self):
-        model = MLP(64, 32, activation="tanh")
+        model = MLP(64, 32, 64, 2, "tanh")
         with torch.no_grad():
             self.assertEqual(model(torch.randn(4, 64)).shape, (4, 32))
 
     def test_invalid_activation_raises(self):
-        with self.assertRaises(ValueError):
-            MLP(64, 32, activation="sigmoid")
+        with self.assertRaises(KeyError):
+            MLP(64, 32, 64, 2, "sigmoid")
 
     def test_backward_pass(self):
-        model = MLP(32, 16, hidden_size=32, num_layers=2)
+        model = MLP(32, 16, 32, 2, "relu")
         x = torch.randn(4, 32, requires_grad=True)
         model(x).mean().backward()
         self.assertIsNotNone(x.grad)
@@ -347,7 +229,7 @@ class TestMLPShape(unittest.TestCase):
 class TestSnapshot(unittest.TestCase):
 
     def _make_model_and_opt(self):
-        model = MLP(16, 8, hidden_size=16, num_layers=2)
+        model = MLP(16, 8, 16, 2, "relu")
         opt   = torch.optim.Adam(model.parameters(), lr=1e-3)
         return model, opt
 

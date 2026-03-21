@@ -126,11 +126,10 @@ if run_nonlinear:
 
     print(f"[nonlinear] integrator={ncfg.integrator}  dt={ncfg.dt_internal:.5f}  TSCREEN={ncfg.TSCREEN}")
     t_hist, U_hist, xx, yy, _, _, _, _ = wave2d_spectral(
-        ncfg.Lx, ncfg.Ly, ncfg.nx, ncfg.ny, TF=ncfg.TF, TSCREEN=ncfg.TSCREEN,
-        g=ncfg.g, h0=ncfg.h0, f_coriolis=ncfg.f_coriolis, nu_h=ncfg.nu_h, nu_q=ncfg.nu_q,
-        nudging_coeff=ncfg.nudging_coeff,
-        initial_condition=ncfg.compare_ic, rng_seed=ncfg.compare_seed,
-        integrator=ncfg.integrator, dt=ncfg.dt_internal, verbose=True,
+        ncfg.TF, ncfg.TSCREEN, ncfg.Lx, ncfg.Ly, ncfg.nx, ncfg.ny,
+        ncfg.g, ncfg.h0, ncfg.f_coriolis, ncfg.nu_h, ncfg.nu_q,
+        ncfg.nudging_coeff, ncfg.integrator, ncfg.dt_internal,
+        ncfg.compare_ic, ncfg.compare_seed, True,
     )
     print(f"[nonlinear] n_frames={U_hist.shape[3]}, t_end={t_hist[-1]:.4f}")
     save_gif_multi(U_hist, t_hist, ncfg.Lx, ncfg.Ly,

@@ -39,10 +39,9 @@ def _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, 
 
 
 
-def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nudging_coeff=0.0, initial_condition, rng_seed, integrator="imex", dt):
-    """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, advance_fn, dt, xx, yy)。
-    integrator: "imex"（Strang splitting）或 "rk4"（纯显式）。
-    dt: 时间步长，必须显式传入（从 config.dt_internal 读取）。"""
+def setup_wave2d_nonlinear(Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
+                           nudging_coeff, integrator, dt, initial_condition, rng_seed):
+    """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, advance_fn, dt, xx, yy)。"""
     rng = np.random.default_rng(rng_seed)
     c = np.sqrt(g * h0)
     c2 = g * h0            # c² = g·h0，用于 resolvent
@@ -170,38 +169,16 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, *, g, h0, f_coriolis, nu_h, nu_q, nud
     return h, qx, qy, rhs, advance_fn, dt, xx, yy
 
 
-def wave2d_spectral(
-    Lx,
-    Ly,
-    nx,
-    ny,
-    TF,
-    TSCREEN,
-    *,
-    g,
-    h0,
-    f_coriolis,
-    nu_h,
-    nu_q,
-    nudging_coeff=0.0,
-    initial_condition,
-    rng_seed,
-    integrator="imex",
-    dt,
-    verbose=False,
-):
+def wave2d_spectral(TF, TSCREEN, Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
+                    nudging_coeff, integrator, dt, initial_condition, rng_seed, verbose):
     """
-    Run shallow-water solver. All parameters from config; no defaults here.
+    Run shallow-water solver.
     Returns: t_history, U_history (nx, ny, 3, n_frames), xx, yy, initial_condition, g, h0, c
     U_history[:,:,0,:] = h - h0, [:,:,1,:] = qx, [:,:,2,:] = qy
     """
     h, qx, qy, rhs, advance_fn, dt, xx, yy = setup_wave2d_nonlinear(
-        Lx, Ly, nx, ny,
-        g=g, h0=h0, f_coriolis=f_coriolis, nu_h=nu_h, nu_q=nu_q,
-        nudging_coeff=nudging_coeff,
-        initial_condition=initial_condition, rng_seed=rng_seed,
-        integrator=integrator, dt=dt,
-    )
+        Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
+        nudging_coeff, integrator, dt, initial_condition, rng_seed)
 
     n_frames = (int(np.ceil(TF / dt)) // TSCREEN) + 1
     t_history = np.zeros(n_frames)

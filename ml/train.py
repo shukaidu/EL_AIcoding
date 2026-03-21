@@ -16,82 +16,66 @@ from ml.train_loop import get_device, plot_training_history
 from ml.snapshot import save_checkpoint
 
 
-def _tv_loss(pred, smooth_weight, smooth_mode):
-    """Total-variation regularisation loss over spatial dimensions."""
-    C = pred.shape[1]
-    weights = [smooth_weight] * C if isinstance(smooth_weight, (int, float)) else list(smooth_weight)
-    tv = 0.0
-    for c, w in enumerate(weights):
-        if w == 0.0:
-            continue
-        pc = pred[:, c]
-        gx = pc[:, :, 1:] - pc[:, :, :-1]
-        gy = pc[:, 1:, :] - pc[:, :-1, :]
-        tv_c = gx.abs().mean() + gy.abs().mean()
-        if smooth_mode == "relative":
-            tv_c = tv_c / pc.abs().mean().clamp(min=1e-6)
-        tv = tv + w * tv_c
-    return tv
-
-
-def _weighted_loss(crit_none, pred, tgt, w):
-    raw = crit_none(pred, tgt)
-    return raw.mean() if w is None else (raw.mean(dim=(0, 2, 3)) * w).sum()
-
-
-def _eval_loss(model, loader, crit_none, w, device):
-    """Mean test loss over loader."""
-    model.eval()
-    with torch.no_grad():
-        total = sum(_weighted_loss(crit_none, model(i), t, w).item() for i, t in loader)
-    return total / len(loader)
-
-
-def _run_epochs(model, train_loader, test_loader, optimizer, num_epochs, lr_schedule,
-                smooth_weight=0.0, smooth_mode="absolute", param_ratio=None):
+def _run_epochs(model, train_loader, test_loader, optimizer, cfg):
     crit_none = torch.nn.L1Loss(reduction="none")
     hist_tr, hist_te = [], []
     device = next(model.parameters()).device
-    w = torch.tensor(param_ratio, dtype=torch.float32, device=device) if param_ratio is not None else None
+    nonlinear = hasattr(cfg, "smooth_weight")
+    if nonlinear:
+        w = torch.tensor(cfg.param_ratio, dtype=torch.float32, device=device)
+        smooth_weight = cfg.smooth_weight
+        smooth_mode = cfg.smooth_mode
 
-    for epoch in range(1, num_epochs + 1):
-        lr = next(lr for e, lr in lr_schedule if epoch <= e)
+    def _loss(pred, tgt):
+        raw = crit_none(pred, tgt)
+        if not nonlinear:
+            return raw.mean()
+        loss = (raw.mean(dim=(0, 2, 3)) * w).sum()
+        weights = [smooth_weight] * pred.shape[1] if isinstance(smooth_weight, (int, float)) else list(smooth_weight)
+        tv = 0.0
+        for c, sw in enumerate(weights):
+            if sw == 0.0:
+                continue
+            pc = pred[:, c]
+            gx = pc[:, :, 1:] - pc[:, :, :-1]
+            gy = pc[:, 1:, :] - pc[:, :-1, :]
+            tv_c = gx.abs().mean() + gy.abs().mean()
+            if smooth_mode == "relative":
+                tv_c = tv_c / pc.abs().mean().clamp(min=1e-6)
+            tv = tv + sw * tv_c
+        return loss + tv
+
+    for epoch in range(1, cfg.num_epochs + 1):
+        lr = next(lr for e, lr in cfg.lr_schedule if epoch <= e)
         for pg in optimizer.param_groups:
             pg["lr"] = lr
 
         model.train()
         tr = 0.0
         for inp, tgt in train_loader:
-            pred = model(inp)
-            loss = _weighted_loss(crit_none, pred, tgt, w)
-            data_loss = loss.item()
-            loss = loss + _tv_loss(pred, smooth_weight, smooth_mode)
+            loss = _loss(model(inp), tgt)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            tr += data_loss
+            tr += loss.item()
         hist_tr.append(tr / len(train_loader))
 
-        te = _eval_loss(model, test_loader, crit_none, w, device)
+        model.eval()
+        with torch.no_grad():
+            te = sum(_loss(model(inp), tgt).item() for inp, tgt in test_loader) / len(test_loader)
         hist_te.append(te)
-        print(f"Epoch [{epoch}/{num_epochs}], lr={lr:.0e}, Train: {hist_tr[-1]:.6f}, Test: {te:.6f}")
+        print(f"Epoch [{epoch}/{cfg.num_epochs}], lr={lr:.0e}, Train: {hist_tr[-1]:.6f}, Test: {te:.6f}")
 
     return hist_tr, hist_te
 
 
-def _run(model, train_loader, test_loader, cfg, data_dir, **ckpt_extra):
+def _run(model, train_loader, test_loader, cfg, data_dir):
+    """训练并保存曲线，返回 (opt, hist_tr, hist_te)。checkpoint 由调用方负责保存。"""
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr_schedule[0][1])
-    hist_tr, hist_te = _run_epochs(
-        model, train_loader, test_loader, opt, cfg.num_epochs, cfg.lr_schedule,
-        smooth_weight=getattr(cfg, "smooth_weight", 0.0),
-        smooth_mode=getattr(cfg, "smooth_mode", "absolute"),
-        param_ratio=getattr(cfg, "param_ratio", None),
-    )
-    save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te,
-                    os.path.join(data_dir, cfg.model_pth), **ckpt_extra)
+    hist_tr, hist_te = _run_epochs(model, train_loader, test_loader, opt, cfg)
     savemat(os.path.join(data_dir, cfg.error_mat), {"train_err": hist_tr, "test_err": hist_te})
     plot_training_history(hist_tr, hist_te, os.path.join(data_dir, "training_history.png"))
-    print(f"Saved {os.path.join(data_dir, cfg.model_pth)}")
+    return opt, hist_tr, hist_te
 
 
 def main():
@@ -113,10 +97,13 @@ def main():
         if not os.path.isfile(path):
             print(f"Data not found: {path}. Run: python gen_data.py --problem {problem}")
             return
-        tl, vl, N_i, N_o, _ = load_mat(path, device, b_size=cfg.b_size)
-        activation = getattr(cfg, "activation", "relu")
-        model = MLP(N_i, N_o, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation=activation).to(device)
-        _run(model, tl, vl, cfg, data_dir, hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation=activation)
+        tl, vl, N_i, N_o, _ = load_mat(path, device, cfg.b_size, cfg.test_split)
+        model = MLP(N_i, N_o, cfg.hidden_size, cfg.num_layers, cfg.activation).to(device)
+        opt, hist_tr, hist_te = _run(model, tl, vl, cfg, data_dir)
+        save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te,
+                        os.path.join(data_dir, cfg.model_pth),
+                        hidden_size=cfg.hidden_size, num_layers=cfg.num_layers, activation=cfg.activation)
+        print(f"Saved {os.path.join(data_dir, cfg.model_pth)}")
         return
 
     if problem == "wave_2d_nonlinear":
@@ -125,19 +112,18 @@ def main():
         if not os.path.isfile(path):
             print(f"Data not found: {path}. Run: python gen_data.py --problem wave_2d_nonlinear")
             return
-        residual = getattr(cfg, "residual", False)
-        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny, stats = load_wave_2d_nonlinear(
-            path, device, b_size=cfg.b_size, residual=residual)
-        model_type = getattr(cfg, "model_type", "cnn").lower()
-        ckpt_extra = dict(base=cfg.base, model_type=model_type,
-                          ch_mean=stats["ch_mean"], ch_std=stats["ch_std"], residual=residual)
-        if model_type == "unet":
-            pooling = getattr(cfg, "pooling", "max")
-            model = UNet(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx, pooling=pooling).to(device)
-            ckpt_extra["pooling"] = pooling
+        tl, vl, _, C_in, C_out, Nx, Ny, nx, ny, stats = load_wave_2d_nonlinear(path, device, cfg.b_size, cfg.test_split, cfg.residual)
+        if cfg.model_type.lower() == "unet":
+            model = UNet(C_in, C_out, cfg.base, Nx, nx, cfg.pooling).to(device)
         else:
-            model = CNN(Cin=C_in, Cout=C_out, base=cfg.base, Nx=Nx, nx=nx).to(device)
-        _run(model, tl, vl, cfg, data_dir, **ckpt_extra)
+            model = CNN(C_in, C_out, cfg.base, Nx, nx).to(device)
+        opt, hist_tr, hist_te = _run(model, tl, vl, cfg, data_dir)
+        save_checkpoint(model, opt, cfg.num_epochs, hist_tr, hist_te,
+                        os.path.join(data_dir, cfg.model_pth),
+                        base=cfg.base, model_type=cfg.model_type.lower(),
+                        pooling=cfg.pooling, residual=cfg.residual,
+                        ch_mean=stats["ch_mean"], ch_std=stats["ch_std"])
+        print(f"Saved {os.path.join(data_dir, cfg.model_pth)}")
 
 
 if __name__ == "__main__":

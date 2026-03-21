@@ -14,7 +14,7 @@ class ResBlock(nn.Module):
 
 
 class CNN(nn.Module):
-    def __init__(self, Cin=3, Cout=3, base=32, Nx=64, nx=32):
+    def __init__(self, Cin, Cout, base, Nx, nx):
         super().__init__()
         L = (Nx - nx) // 4
         assert 4 * L == Nx - nx and L >= 1

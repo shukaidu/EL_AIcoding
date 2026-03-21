@@ -94,18 +94,3 @@ def burgers_1d_main(nx, dx, dt, L, nu, alpha, u_mean, TF, TSCREEN, rng_seed, ver
                   f"elapsed={elapsed:.1f}s  |u|_max={np.max(np.abs(u)):.4f}", flush=True)
     return t_history, u_history, xc
 
-
-if __name__ == "__main__":
-    import os
-    import sys
-    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if _root not in sys.path:
-        sys.path.insert(0, _root)
-    from config import burgers_1d_config as cfg
-    TF = cfg.nt * cfg.dt
-    t_hist, u_hist, xc = burgers_1d_main(
-        cfg.nx, cfg.dx, cfg.dt, cfg.L, cfg.nu, cfg.alpha, cfg.u_mean,
-        TF=TF, TSCREEN=cfg.njp, rng_seed=42, verbose=True,
-    )
-    print(f"nx={cfg.nx}  n_frames={u_hist.shape[1]}  t_end={t_hist[-1]:.4f}")
-    print(f"u0 mean={u_hist[:, 0].mean():.6f}  u_final mean={u_hist[:, -1].mean():.6f}")
