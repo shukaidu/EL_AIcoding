@@ -124,6 +124,7 @@ def _wave2d_nonlinear_single_run(args):
         cfg.g, cfg.h0, cfg.f_coriolis, cfg.nu_h, cfg.nu_q,
         cfg.nudging_coeff, cfg.integrator, cfg.dt_internal,
         ic, seed, False,
+        cfg.ic_alpha_ring, cfg.ic_alpha_random,
     )
     return t_hist, U_hist
 

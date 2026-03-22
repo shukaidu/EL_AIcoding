@@ -23,13 +23,14 @@ def _gen_dist_2d(xgrid, ygrid, alpha, rng):
     return X
 
 
-def _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, Dy_lin):
+def _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, Dy_lin,
+              ic_alpha_ring, ic_alpha_random):
     """Build initial h, qx, qy. ic_type: ring, random."""
     if initial_condition == "ring":
         h = h0 + 0.1 * np.exp(-50 * ((xx - Lx / 3) ** 2 + (yy - Ly / 2) ** 2))
-        psi = 0.5 * _gen_dist_2d(xgrid, ygrid, 3.0, rng)
+        psi = 0.5 * _gen_dist_2d(xgrid, ygrid, ic_alpha_ring, rng)
     elif initial_condition == "random":
-        psi = 0.5 * _gen_dist_2d(xgrid, ygrid, 2.5, rng)
+        psi = 0.5 * _gen_dist_2d(xgrid, ygrid, ic_alpha_random, rng)
         h = h0 + 0.0 * psi
     else:
         raise ValueError(f"Unknown initial_condition: {initial_condition}")
@@ -40,7 +41,8 @@ def _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, 
 
 
 def setup_wave2d_nonlinear(Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
-                           nudging_coeff, integrator, dt, initial_condition, rng_seed):
+                           nudging_coeff, integrator, dt, initial_condition, rng_seed,
+                           ic_alpha_ring, ic_alpha_random):
     """初始化网格、算子、初始条件。返回 (h, qx, qy, rhs, advance_fn, dt, xx, yy)。"""
     rng = np.random.default_rng(rng_seed)
     c = np.sqrt(g * h0)
@@ -76,7 +78,8 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
     def filter_nl(f):
         return ifft2r(np.fft.fft2(f) * dealias)
 
-    h, qx, qy = _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, Dy_lin)
+    h, qx, qy = _build_ic(initial_condition, xx, yy, xgrid, ygrid, Lx, Ly, h0, rng, Dx_lin, Dy_lin,
+                          ic_alpha_ring, ic_alpha_random)
 
     def rhs(h, qx, qy):
         h_safe = np.maximum(h, 1e-10)
@@ -170,7 +173,8 @@ def setup_wave2d_nonlinear(Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
 
 
 def wave2d_spectral(TF, TSCREEN, Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
-                    nudging_coeff, integrator, dt, initial_condition, rng_seed, verbose):
+                    nudging_coeff, integrator, dt, initial_condition, rng_seed, verbose,
+                    ic_alpha_ring, ic_alpha_random):
     """
     Run shallow-water solver.
     Returns: t_history, U_history (nx, ny, 3, n_frames), xx, yy, initial_condition, g, h0, c
@@ -178,7 +182,8 @@ def wave2d_spectral(TF, TSCREEN, Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
     """
     h, qx, qy, rhs, advance_fn, dt, xx, yy = setup_wave2d_nonlinear(
         Lx, Ly, nx, ny, g, h0, f_coriolis, nu_h, nu_q,
-        nudging_coeff, integrator, dt, initial_condition, rng_seed)
+        nudging_coeff, integrator, dt, initial_condition, rng_seed,
+        ic_alpha_ring, ic_alpha_random)
 
     n_frames = (int(np.ceil(TF / dt)) // TSCREEN) + 1
     t_history = np.zeros(n_frames)

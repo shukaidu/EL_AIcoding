@@ -9,6 +9,7 @@ import torch
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 _repo_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _repo_root)
@@ -127,6 +128,7 @@ def _compare_burgers_1d(data_dir, out_dir):
         ax.set_xlabel("x")
         ax.set_ylabel("u(x, t)")
         ax.set_title(f"t = {i * dt_nn:.2f}")
+        _draw_windows_1d(ax, cfg)
         ax.legend()
         ax.set_ylim(y_lim)
         _timing_annotation(ax, fv_times[i], nn_times[i])
@@ -213,6 +215,8 @@ def _compare_wave_2d_linear(data_dir, out_dir):
         fig, axes = plt.subplots(2, 2, figsize=(10, 8), constrained_layout=True)
         for c_idx, (s_frames, n_frames, name) in enumerate(zip([spec_u, spec_v], [nn_u, nn_v], ["u", "v"])):
             _pcolor_row(fig, axes[:, c_idx], xx, yy, s_frames[i], n_frames[i], name, clims[c_idx])
+            for r, ax in enumerate(axes[:, c_idx]):
+                _draw_windows_2d(ax, cfg, legend=(c_idx == 0 and r == 0))
         _timing_annotation(fig, spec_times[i], nn_times[i], use_fig=True)
         plt.suptitle(f"t = {i * dt_nn:.3f}")
         plt.savefig(os.path.join(out_dir, f"t{idx}.png"), dpi=120)
@@ -281,6 +285,7 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None, residual=False, ch
         cfg.Lx, cfg.Ly, cfg.nx, cfg.ny, cfg.g, cfg.h0, cfg.f_coriolis,
         cfg.nu_h, cfg.nu_q, cfg.nudging_coeff, cfg.integrator, cfg.dt_internal,
         cfg.compare_ic, cfg.compare_seed,
+        cfg.ic_alpha_ring, cfg.ic_alpha_random,
     )
 
     steps_per_nn = cfg.TSCREEN * cfg.njp
@@ -332,6 +337,8 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None, residual=False, ch
         for c in range(3):
             _pcolor_row(fig, axes[:, c], xx, yy,
                         spec_frames[i][:, :, c], nn_frames[i][:, :, c], comp_names[c], clims[c])
+            for r, ax in enumerate(axes[:, c]):
+                _draw_windows_2d(ax, cfg, legend=(c == 0 and r == 0))
         _timing_annotation(fig, spec_times[i], nn_times[i], use_fig=True)
         plt.suptitle(f"t = {i * dt_nn:.3f}")
         plt.savefig(os.path.join(out_dir, f"t{idx}.png"), dpi=120)
@@ -343,6 +350,40 @@ def _compare_wave_2d_nonlinear(data_dir, out_dir, model=None, residual=False, ch
 # ---------------------------------------------------------------------------
 # Plot helpers
 # ---------------------------------------------------------------------------
+
+def _draw_windows_1d(ax, cfg):
+    """在 1D 图上叠加输入/输出窗口（居中，axvspan）。"""
+    x_center = cfg.L / 2
+    patch_side = cfg.nwd + 2 * cfg.nst
+    half_in  = patch_side * cfg.dx / 2
+    half_out = cfg.nwd    * cfg.dx / 2
+    ax.axvline(x_center - half_in,  color='steelblue', linewidth=1.5, linestyle='--', label='Input window')
+    ax.axvline(x_center + half_in,  color='steelblue', linewidth=1.5, linestyle='--')
+    ax.axvline(x_center - half_out, color='orange',    linewidth=1.5, linestyle='--', label='Output window')
+    ax.axvline(x_center + half_out, color='orange',    linewidth=1.5, linestyle='--')
+
+
+def _draw_windows_2d(ax, cfg, legend=False):
+    """在 2D 图上叠加输入/输出窗口矩形（居中）。"""
+    patch_side = getattr(cfg, 'patch_side', cfg.nwd + 2 * cfg.nst)
+    x_c, y_c = cfg.Lx / 2, cfg.Ly / 2
+    w_in  = patch_side * cfg.dx
+    w_out = cfg.nwd    * cfg.dx
+    rect_in = mpatches.Rectangle(
+        (x_c - w_in/2,  y_c - w_in/2),  w_in,  w_in,
+        linewidth=2, edgecolor='steelblue', facecolor='none',
+        label='Input window'
+    )
+    rect_out = mpatches.Rectangle(
+        (x_c - w_out/2, y_c - w_out/2), w_out, w_out,
+        linewidth=2, edgecolor='orange', facecolor='none',
+        label='Output window'
+    )
+    ax.add_patch(rect_in)
+    ax.add_patch(rect_out)
+    if legend:
+        ax.legend(handles=[rect_in, rect_out], loc='upper right', fontsize=7)
+
 
 def _symm_clim(frames):
     """Symmetric color limits [-vmax, vmax] from a list of 2D arrays."""

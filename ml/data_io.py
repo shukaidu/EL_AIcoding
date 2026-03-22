@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 
 
 def _loaders(X, Y, device, b_size, test_split):
-    Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=test_split, random_state=42)
+    Xtr, Xte, Ytr, Yte = train_test_split(X, Y, test_size=test_split, random_state=1337)
     tr_ds = torch.utils.data.TensorDataset(
         torch.tensor(Xtr, dtype=torch.float32).to(device),
         torch.tensor(Ytr, dtype=torch.float32).to(device),
@@ -35,7 +35,7 @@ def load_wave_2d_nonlinear(path, device, b_size, test_split, residual):
     xi, xo = d["input_tensor"], d["output_tensor"]
 
     # Per-channel stats from training split only (avoid leakage)
-    idx_tr, _ = train_test_split(np.arange(len(xi)), test_size=test_split, random_state=42)
+    idx_tr, _ = train_test_split(np.arange(len(xi)), test_size=test_split, random_state=1337)
     ch_mean = xi[idx_tr].mean(axis=(0, 2, 3), keepdims=True).astype(np.float32)  # (1,C,1,1)
     ch_std = xi[idx_tr].std(axis=(0, 2, 3), keepdims=True).clip(1e-8).astype(np.float32)
 

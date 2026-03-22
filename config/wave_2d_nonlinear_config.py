@@ -16,9 +16,9 @@ nudging_coeff = 1.0  # h nudging toward h0 (0 = disabled)
 integrator = "imex"
 
 # Time (solver: dt = 0.5*min(dx,dy)/c, frames every TSCREEN steps)
-TF = 10.0
+TF = 14.0
 dt_internal = 0.5 * min(dx, dy) if integrator == "imex" else 0.5 * min(dx, dy) / c
-TSCREEN = 5
+TSCREEN = 10
 TSCREEN = TSCREEN if integrator == "imex" else round(TSCREEN * c)
 nu_h = 0.0
 nu_q = 1e-3 * (min(dx, dy) ** 2) / dt_internal
@@ -35,9 +35,12 @@ patch_side = nwd + 2 * nst
 
 
 # Data generation
-nsamp = 3000
+nsamp = 2500
 ntest = 5
-ic_list = ["random", "ring"]
+#ic_list = ["random", "ring"]
+ic_list = ["random"]
+ic_alpha_ring   = 3.0   # spectral decay exponent for ring stream function (larger = smoother)
+ic_alpha_random = 3.5   # spectral decay exponent for random stream function (larger = smoother)
 
 # Training
 b_size = 100
@@ -47,15 +50,15 @@ base = 32        # model base channels
 model_type = "unet"   # "cnn" | "unet"
 pooling = "max"       # "max" | "avg" | "stride"
 residual = True       # predict delta (next - current) instead of next state
-lr_schedule = [(60, 3e-4), (110, 1e-4), (140, 3e-5), (150, 1e-5)]
-smooth_weight = [0.0, 0.1, 0.1]    # per-channel [h-h0, qx, qy]
+lr_schedule = [(80, 1e-3), (100, 5e-4), (120, 1e-4), (150, 5e-5)]
+smooth_weight = [0.0, 0.5, 0.5]    # per-channel [h-h0, qx, qy]
 smooth_mode = "absolute"   # "absolute" | "relative"
 param_ratio   = [1.0, 1.0, 1.0]     # h 通道数据损失×10
 
 warmup_T = 5.0   # frames before this time are excluded from training
 
 # Compare (reference vs NN rollout)
-compare_TF = 4.0
+compare_TF = 8.0
 compare_ic = "random"
 compare_seed = 17
 sample_seed = 123

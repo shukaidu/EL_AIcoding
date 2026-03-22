@@ -130,6 +130,7 @@ if run_nonlinear:
         ncfg.g, ncfg.h0, ncfg.f_coriolis, ncfg.nu_h, ncfg.nu_q,
         ncfg.nudging_coeff, ncfg.integrator, ncfg.dt_internal,
         ncfg.compare_ic, ncfg.compare_seed, True,
+        ncfg.ic_alpha_ring, ncfg.ic_alpha_random,
     )
     print(f"[nonlinear] n_frames={U_hist.shape[3]}, t_end={t_hist[-1]:.4f}")
     save_gif_multi(U_hist, t_hist, ncfg.Lx, ncfg.Ly,
