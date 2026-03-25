@@ -11,7 +11,8 @@
       "Bash(cp data/burgers_1d/compare/*.png latex/figures/burgers_1d/)",
       "Bash(cp data/wave_2d_linear/training_history.png latex/figures/wave_2d_linear/)",
       "Bash(cp data/wave_2d_linear/compare/*.png latex/figures/wave_2d_linear/)",
-      "Bash(cp data/wave_2d_nonlinear/training_history.png latex/figures/wave_2d_nonlinear/)"
+      "Bash(cp data/wave_2d_nonlinear/training_history.png latex/figures/wave_2d_nonlinear/)",
+      "Bash(cp data/wave_2d_nonlinear/compare/*.png latex/figures/wave_2d_nonlinear/)"
     ]
   }
 }

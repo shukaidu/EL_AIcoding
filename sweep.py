@@ -1,4 +1,4 @@
-"""Hyperparameter sweep for wave_2d_nonlinear — sweeps pooling type.
+"""Hyperparameter sweep for wave_2d_nonlinear — sweeps smooth_weight.
 Usage: python sweep.py
 Each config: trains model -> runs full compare (with figures).
 Output images: data/wave_2d_nonlinear/sweep/<label>/
@@ -23,9 +23,10 @@ from compare import _compare_wave_2d_nonlinear
 import config.wave_2d_nonlinear_config as cfg
 
 # ---------------------------------------------------------------------------
-# Sweep grid: vary pooling only; all other params from config
+# Sweep grid: vary smooth_weight only; all other params from config
+# w_h fixed at 0; sweep w for qx and qy symmetrically: [0.0, w, w]
 # ---------------------------------------------------------------------------
-POOLING_OPTIONS = ["max", "avg", "stride"]
+SMOOTH_W_VALUES = [0.0, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0]
 
 
 def main():
@@ -42,15 +43,16 @@ def main():
     ch_mean, ch_std = stats["ch_mean"], stats["ch_std"]
 
     results = []
-    for pooling in POOLING_OPTIONS:
-        label = f"pool_{pooling}"
+    for w in SMOOTH_W_VALUES:
+        smooth_weight = [0.0, w, w]
+        label = f"tv_0.0_{w}_{w}"
         out_dir = os.path.join(sweep_dir, label)
 
         sweep_cfg = types.SimpleNamespace(**{k: getattr(cfg, k) for k in dir(cfg) if not k.startswith("_")})
-        sweep_cfg.pooling = pooling
+        sweep_cfg.smooth_weight = smooth_weight
 
         print(f"\n{'='*60}")
-        print(f"pooling={pooling!r}")
+        print(f"smooth_weight={smooth_weight}")
         print("=" * 60)
 
         if cfg.model_type.lower() == "unet":
@@ -75,19 +77,21 @@ def main():
             ch_mean=ch_mean, ch_std=ch_std)
         speedup = sp_t / nn_t if nn_t > 0 else float("nan")
         print(f"  L1 mean={l1_mean:.6f}  max={l1_max:.6f}  speedup={speedup:.1f}x")
-        results.append(dict(label=label, pooling=pooling, l1_mean=l1_mean, l1_max=l1_max,
+        results.append(dict(label=label, smooth_weight=smooth_weight, w=w,
+                            l1_mean=l1_mean, l1_max=l1_max,
                             speedup=speedup, train_time=train_time))
 
     # Summary table
     print("\n" + "=" * 60)
-    print(f"{'pooling':<12} {'L1 mean':>10} {'L1 max':>10} {'Speedup':>8}")
+    print(f"{'smooth_weight':<22} {'L1 mean':>10} {'L1 max':>10} {'Speedup':>8}")
     print("-" * 60)
     for r in results:
-        print(f"{r['pooling']:<12} {r['l1_mean']:>10.6f} {r['l1_max']:>10.6f} {r['speedup']:>7.1f}x")
+        sw_str = f"[0.0, {r['w']}, {r['w']}]"
+        print(f"{sw_str:<22} {r['l1_mean']:>10.6f} {r['l1_max']:>10.6f} {r['speedup']:>7.1f}x")
     print("=" * 60)
 
     best = min(results, key=lambda x: x["l1_mean"])
-    print(f"\nBest: pooling={best['pooling']!r}  L1 mean={best['l1_mean']:.6f}")
+    print(f"\nBest: smooth_weight={best['smooth_weight']}  L1 mean={best['l1_mean']:.6f}")
 
 
 if __name__ == "__main__":

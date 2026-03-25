@@ -105,20 +105,20 @@ The goal is to learn a local map on a small spatial element or patch from data p
     Viscosity $\nu_h$ & 0 \\
     Nudging coefficient & 1.0 \\
     Batch size & 100 \\
-    Warmup time & 5.0 \\
+    Warmup time & 2.0 \\
     Compare $T_F$ & 8.0 \\
     Compare frames & 8 \\
     Compare IC & random \\
-    Training samples & 3000 \\
+    Training samples & 2500 \\
     Frames per NN step $n_{\mathrm{jp}}$ & 2 \\
     Epochs & 150 \\
     Model type & UNet \\
     UNet base channels & 32 \\
-    Pooling & max \\
-    Residual prediction & True \\
-    TV smooth weight & [0.0, 1, 1] \\
+    Pooling & avg \\
+    Residual prediction & False \\
+    TV smooth weight & [0, 0.1, 0.1] \\
     TV smooth mode & absolute \\
-    Data loss channel weights & [1, 1, 1] \\
+    Data loss channel weights & [1.0, 1.0, 1.0] \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -149,7 +149,7 @@ Figure~\ref{fig:training} shows the train and test loss versus epoch for the thr
 \end{figure}
 
 \subsection{1D Burgers: FV vs. NN}
-Comparison at 6 output times over $t\in[0,2]$ with \texttt{compare\_t\_end=2.0}. Runtime for this run: FV total $1.703$\,s, NN total $0.3256$\,s, speedup $5.2\times$.
+Comparison at 6 output times over $t\in[0,2]$ with \texttt{compare\_t\_end=2.0}. Runtime for this run: FV total $2.778$\,s, NN total $0.5852$\,s, speedup $4.7\times$.
 
 \begin{figure}[H]
   \centering
@@ -168,7 +168,7 @@ Comparison at 6 output times over $t\in[0,2]$ with \texttt{compare\_t\_end=2.0}.
 \end{figure}
 
 \subsection{2D linear wave: Spectral vs. NN}
-Comparison at 6 aligned frames with \texttt{compare\_TF=2.0} and \texttt{compare\_ic=ring}. Runtime for this run: spectral $7.336$\,s, NN $0.1928$\,s, speedup $38.1\times$.
+Comparison at 6 aligned frames with \texttt{compare\_TF=2.0} and \texttt{compare\_ic=ring}. Runtime for this run: spectral $10.323$\,s, NN $0.4576$\,s, speedup $22.6\times$.
 
 \begin{figure}[H]
   \centering
@@ -187,7 +187,7 @@ Comparison at 6 aligned frames with \texttt{compare\_TF=2.0} and \texttt{compare
 \end{figure}
 
 \subsection{2D nonlinear shallow water: Spectral vs. NN}
-Comparison at 8 aligned frames for $(h-h_0,q_x,q_y)$ with \texttt{compare\_TF=8.0} and \texttt{compare\_ic=random}. Both rollouts start after warmup time $T=5.0$. Final rollout metrics for this run: mean L1 error $0.054026$, max-frame L1 error $0.105381$, spectral runtime $111.115$\,s, NN runtime $9.2132$\,s, speedup $12.1\times$.
+Comparison at 8 aligned frames for $(h-h_0,q_x,q_y)$ with \texttt{compare\_TF=8.0} and \texttt{compare\_ic=random}. Both rollouts start after warmup time $T=2.0$. Final rollout metrics for this run: mean L1 error $0.047030$, max-frame L1 error $0.075241$, spectral runtime $161.058$\,s, NN runtime $10.251$\,s, speedup $15.7\times$.
 
 \begin{figure}[H]
   \centering
