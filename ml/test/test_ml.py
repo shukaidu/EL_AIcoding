@@ -80,7 +80,7 @@ class TestLoadWave2dNonlinear(unittest.TestCase):
         tl, *_, stats = self._load(mat, residual=False)
 
         xi, xo = mat["input_tensor"], mat["output_tensor"]
-        idx_tr, _ = _split(np.arange(N), test_size=0.2, random_state=42)
+        idx_tr, _ = _split(np.arange(N), test_size=0.2, random_state=1337)
         mean = stats["ch_mean"].reshape(1, -1, 1, 1)
         std  = stats["ch_std"].reshape(1, -1, 1, 1)
         expected = ((xo - mean) / std)[idx_tr]  # 与 loader 同顺序
@@ -96,7 +96,7 @@ class TestLoadWave2dNonlinear(unittest.TestCase):
         tl, vl, _, _, _, Nx, _, nx, _, stats = self._load(mat, residual=True)
 
         xi, xo = mat["input_tensor"], mat["output_tensor"]
-        idx_tr, _ = _split(np.arange(N), test_size=0.2, random_state=42)
+        idx_tr, _ = _split(np.arange(N), test_size=0.2, random_state=1337)
         mean = stats["ch_mean"].reshape(1, -1, 1, 1)
         std  = stats["ch_std"].reshape(1, -1, 1, 1)
         xi_norm = (xi - mean) / std

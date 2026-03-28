@@ -16,7 +16,8 @@ _g,  _h0  = 9.8, 1.0
 DT_TEST   = 0.5 * (_Lx / _nx) / np.sqrt(_g * _h0)
 
 _COMMON = dict(Lx=_Lx, Ly=_Ly, nx=_nx, ny=_ny, g=_g, h0=_h0,
-               f_coriolis=0.0, nu_h=0.0, nu_q=0.0, nudging_coeff=0.0)
+               f_coriolis=0.0, nu_h=0.0, nu_q=0.0, nudging_coeff=0.0,
+               ic_alpha_ring=3.0, ic_alpha_random=2.5)
 
 
 class TestWave2DNonlinear(unittest.TestCase):
